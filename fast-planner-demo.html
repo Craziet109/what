@@ -1,0 +1,4913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast-Planner 前端 · 运动动力学路径搜索（交互图解）</title>
+<style>
+/* ============================================================
+   Fast-Planner 前端 · 交互教学页样式
+   纯本地、无外部字体/依赖（页面可能以 file:// 直接打开）
+   ============================================================ */
+
+:root{
+  --bg:#0b1120;
+  --bg-2:#0f1730;
+  --card:#141d38;
+  --card-2:#18223f;
+  --line:#24304f;
+  --line-soft:#1c2743;
+  --ink:#e8ecf8;
+  --muted:#9aa7c7;
+  --dim:#6f7c9c;
+  --blue:#4ea1ff;
+  --teal:#39e0b0;
+  --orange:#ffb454;
+  --red:#ff5c7a;
+  --purple:#a78bfa;
+  --radius:14px;
+  --mono:"Cascadia Mono","Consolas","SFMono-Regular",ui-monospace,monospace;
+  --sans:system-ui,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, #16234a 0%, transparent 60%),
+    radial-gradient(900px 500px at 95% 5%, #12283d 0%, transparent 55%),
+    var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+b{color:#fff;font-weight:650}
+em{font-style:normal}
+.mono{font-family:var(--mono);font-size:.94em}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+.c-blue{color:var(--blue)}
+.c-teal{color:var(--teal)}
+.c-orange{color:var(--orange)}
+.c-red{color:var(--red)}
+.c-purple{color:var(--purple)}
+
+/* ---------- 顶部进度条与导航 ---------- */
+.scroll-progress{
+  position:fixed;top:0;left:0;right:0;height:3px;z-index:60;
+  background:rgba(255,255,255,.05);
+}
+.scroll-progress span{
+  display:block;height:100%;width:0%;
+  background:linear-gradient(90deg,var(--blue),var(--teal),var(--orange));
+  box-shadow:0 0 12px rgba(78,161,255,.7);
+}
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:10px 26px;
+  background:rgba(11,17,32,.82);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px}
+.brand .dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--teal);box-shadow:0 0 12px var(--teal);
+  animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.6}}
+.brand-sub{color:var(--dim);font-weight:400;font-size:.82rem}
+.topnav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.topnav a{
+  padding:5px 11px;border-radius:999px;color:var(--muted);
+  font-size:.88rem;transition:.2s;border:1px solid transparent;
+}
+.topnav a:hover{color:#fff;background:rgba(78,161,255,.12);text-decoration:none}
+.topnav a.active{color:#fff;background:rgba(78,161,255,.18);border-color:rgba(78,161,255,.45)}
+
+/* ---------- HERO ---------- */
+.hero{position:relative;overflow:hidden;padding:66px 26px 54px;border-bottom:1px solid var(--line-soft)}
+.hero-glow{
+  position:absolute;inset:-30% -10% auto -10%;height:520px;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(78,161,255,.20),transparent 70%);
+  filter:blur(6px);
+}
+.hero-inner{position:relative;max-width:1180px;margin:0 auto}
+.eyebrow{
+  color:var(--teal);font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;
+  margin:0 0 12px;
+}
+.hero h1{
+  font-size:clamp(1.7rem,3.4vw,2.7rem);line-height:1.3;margin:0 0 16px;font-weight:750;
+}
+.hero h1 em{
+  background:linear-gradient(90deg,var(--blue),var(--teal));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.lede{font-size:1.06rem;color:#cfd8ee;max-width:78ch;margin:0 0 22px}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:20px}
+.chip{
+  padding:6px 13px;border-radius:999px;font-size:.85rem;color:var(--muted);
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+}
+.chip b{color:var(--ink)}
+.hero-note{
+  max-width:80ch;padding:14px 18px;border-radius:12px;font-size:.92rem;color:#c7d2ea;
+  background:rgba(57,224,176,.06);border:1px solid rgba(57,224,176,.25);
+}
+
+/* ---------- 通用版式 ---------- */
+.section{max-width:1180px;margin:0 auto;padding:58px 26px 10px;scroll-margin-top:70px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:24px;
+}
+.sec-head h2{font-size:clamp(1.25rem,2.2vw,1.7rem);margin:0;font-weight:700}
+.sec-head .num{
+  font-family:var(--mono);color:var(--blue);font-size:.9rem;
+  border:1px solid rgba(78,161,255,.4);border-radius:8px;padding:2px 8px;margin-right:8px;
+  vertical-align:middle;
+}
+.sec-lede{color:#cfd8ee;max-width:88ch;margin:-6px 0 22px}
+.pgtag{
+  font-family:var(--mono);font-size:.74rem;color:var(--orange);
+  background:rgba(255,180,84,.10);border:1px solid rgba(255,180,84,.3);
+  padding:2px 8px;border-radius:999px;white-space:nowrap;
+}
+.cols{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:24px;align-items:start}
+.cols.tight{margin-top:24px}
+.cols+.cols{margin-top:26px}
+@media(max-width:960px){.cols{grid-template-columns:1fr}}
+.prose h3{margin:0 0 12px;font-size:1.06rem;color:#dbe4f8}
+.prose p{margin:0 0 14px;color:#cbd5ec}
+
+/* ---------- 卡片 ---------- */
+.card{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:16px;
+}
+.card h4{margin:0 0 10px;font-size:.98rem;color:#e6ecfb;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card p:last-child{margin-bottom:0}
+.card.highlight{
+  border-color:rgba(78,161,255,.5);
+  box-shadow:0 0 0 1px rgba(78,161,255,.12), 0 12px 30px -18px rgba(78,161,255,.6);
+  background:linear-gradient(180deg,rgba(78,161,255,.10),var(--card-2));
+}
+.card.c-blue-border{border-left:3px solid var(--blue)}
+.card.c-teal-border{border-left:3px solid var(--teal)}
+.card.c-orange-border{border-left:3px solid var(--orange)}
+.card.mini p{font-size:.9rem;color:#c2cde6;line-height:1.7}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.grid-cards .card{margin-bottom:0}
+.searchpane{margin-top:8px}
+.side-card{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;
+}
+.side-card h3{margin:0 0 10px;font-size:1rem;color:#e6ecfb}
+
+/* ---------- 结论/提示 ---------- */
+.callout{
+  border-left:3px solid var(--teal);border-radius:0 12px 12px 0;
+  background:rgba(57,224,176,.07);padding:13px 17px;margin:16px 0;color:#d3ddf3;font-size:.94rem;
+}
+.callout.small{font-size:.9rem;padding:11px 15px}
+.callout-tag{
+  display:inline-block;font-size:.76rem;font-weight:700;letter-spacing:.06em;
+  color:var(--teal);border:1px solid rgba(57,224,176,.45);border-radius:6px;
+  padding:1px 7px;margin-right:8px;vertical-align:1px;
+}
+ul.tick{list-style:none;padding-left:0;margin:0 0 14px}
+ul.tick li{position:relative;padding-left:22px;margin-bottom:9px;color:#cbd5ec;font-size:.95rem}
+ul.tick li::before{
+  content:"";position:absolute;left:4px;top:.62em;width:7px;height:7px;border-radius:2px;
+  background:var(--blue);box-shadow:0 0 8px rgba(78,161,255,.8);
+}
+ol.steps{padding-left:0;list-style:none;counter-reset:s;margin:0 0 16px}
+ol.steps li{
+  counter-increment:s;position:relative;padding-left:42px;margin-bottom:12px;
+  color:#cbd5ec;font-size:.95rem;
+}
+ol.steps li::before{
+  content:counter(s);position:absolute;left:0;top:2px;
+  width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:.82rem;color:#fff;
+  background:linear-gradient(180deg,rgba(78,161,255,.35),rgba(78,161,255,.12));
+  border:1px solid rgba(78,161,255,.5);
+}
+
+/* ---------- 公式 ---------- */
+.formula{
+  font-family:var(--mono);font-size:.92rem;line-height:1.9;color:#dce6ff;
+  background:rgba(9,14,28,.72);border:1px solid var(--line);
+  border-radius:10px;padding:11px 14px;margin:10px 0;overflow-x:auto;
+}
+.formula sup,.formula sub{font-size:.72em}
+.emph{color:var(--orange)!important;font-weight:600}
+
+/* ---------- 表格 ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:.86rem}
+.tbl th,.tbl td{
+  border-bottom:1px solid var(--line-soft);padding:8px 8px;text-align:left;vertical-align:top;
+}
+.tbl th{color:var(--muted);font-weight:600;font-size:.8rem}
+.tbl td:first-child{color:#dbe4f8;white-space:nowrap}
+.tbl tbody tr:hover{background:rgba(78,161,255,.06)}
+
+/* ---------- 画布卡片 ---------- */
+.canvas-card{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px 16px;margin-bottom:16px;
+}
+.canvas-card.wide{margin-bottom:18px}
+.canvas-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.canvas-head h3{margin:0;font-size:.98rem;color:#e6ecfb}
+.canvas-actions{margin-left:auto}
+canvas{display:block;width:100%;border-radius:10px;background:#0d1428;border:1px solid var(--line-soft)}
+/* 画布高度一律由 CSS 钉死。
+   原因：canvas.height 是“反射属性”，给 canvas.height 赋值会同时改写 HTML 的 height 属性；
+   如果布局高度依赖它（CSS 里只写了 width:100%），在 devicePixelRatio > 1 的屏幕上
+   高度会被反复放大，画布一路变长甚至白屏。这里显式写死设计高度，杜绝该反馈回路。 */
+#cv-intuition{height:240px}
+#cv-pipeline{height:300px}
+#cv-pipeline2{height:380px}
+#cv-primitives{height:340px}
+#cv-cost{height:300px}
+#cv-heur{height:320px}
+#cv-heur-cost{height:220px}
+#cv-astar,#cv-hybrid{height:380px}
+.mini-canvas{height:240px}
+.hint{color:var(--dim);font-size:.82rem;margin:10px 0 0;line-height:1.65}
+.tag{
+  font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);
+}
+.tag.blue{color:var(--blue);border-color:rgba(78,161,255,.45);background:rgba(78,161,255,.1)}
+.tag.gray{color:var(--dim)}
+
+/* ---------- 控件 ---------- */
+.controls{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:rgba(255,255,255,.03);border:1px solid var(--line);
+  border-radius:12px;padding:10px 14px;margin-bottom:16px;
+}
+.btn{
+  font-family:var(--sans);font-size:.88rem;color:var(--ink);cursor:pointer;
+  background:rgba(255,255,255,.06);border:1px solid var(--line);
+  border-radius:9px;padding:7px 14px;transition:.18s;
+}
+.btn:hover{background:rgba(78,161,255,.18);border-color:rgba(78,161,255,.5);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.primary{
+  background:linear-gradient(180deg,rgba(78,161,255,.35),rgba(78,161,255,.15));
+  border-color:rgba(78,161,255,.6);font-weight:600;
+}
+.ctrl-inline{display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);white-space:nowrap}
+.ctrl-inline input[type=range]{width:150px;flex:none}
+.ctrl-inline.checkbox{cursor:pointer;user-select:none}
+.panel-inline{
+  display:flex;flex-wrap:wrap;gap:16px 22px;align-items:center;margin-top:14px;
+  background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted);min-width:190px;flex:1 1 190px}
+.ctrl output{font-family:var(--mono);color:var(--blue);font-size:.82rem}
+.readout{display:flex;flex-direction:column;gap:3px;font-size:.82rem;color:var(--muted)}
+.readout b{font-family:var(--mono);color:var(--orange);font-weight:600}
+.status{
+  font-family:var(--mono);font-size:.82rem;color:var(--teal);
+  border-top:1px dashed var(--line);padding-top:8px;margin-top:4px;width:100%;
+}
+.status.warn{color:var(--red)}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:4px;
+  background:linear-gradient(90deg,var(--blue),var(--purple));outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+  background:#fff;border:2px solid var(--blue);box-shadow:0 0 10px rgba(78,161,255,.8);
+}
+input[type=range]::-moz-range-thumb{
+  width:15px;height:15px;border-radius:50%;background:#fff;border:2px solid var(--blue);
+}
+input[type=checkbox]{accent-color:var(--blue);width:15px;height:15px}
+
+/* ---------- 对比区 ---------- */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:900px){.compare{grid-template-columns:1fr}}
+.statbar{
+  display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:10px;
+  font-family:var(--mono);font-size:.78rem;color:var(--muted);
+}
+.statbar .si{white-space:nowrap}
+.statbar .sep{color:var(--dim);opacity:.6;font-size:.9em}
+.statbar b{color:var(--orange);font-weight:600}
+.statbar .ok{color:var(--teal);white-space:nowrap}
+.statbar .bad{color:var(--red);white-space:nowrap}
+/* 左右两张卡片高度对齐：统计栏贴底 */
+.compare .canvas-card{display:flex;flex-direction:column}
+.compare .statbar{margin-top:auto;padding-top:10px}
+
+/* ---------- 伪代码 ---------- */
+.code-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+@media(max-width:900px){.code-grid{grid-template-columns:1fr}}
+.code-card{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;
+}
+.code-card h4{margin:0 0 10px;font-size:.92rem;color:#e6ecfb;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+pre.pseudo{
+  font-family:var(--mono);font-size:.8rem;line-height:1.7;margin:0;
+  /* 每行是 block 级 span，因此这里必须用 normal，否则源码里的换行会撑开行距 */
+  white-space:normal;
+  background:rgba(8,12,24,.85);border:1px solid var(--line-soft);border-radius:10px;
+  padding:10px 12px;overflow-x:auto;color:#b9c6e4;
+}
+pre.pseudo.small{font-size:.78rem}
+pre.pseudo .ln{display:block;padding:1px 6px;border-radius:5px;transition:background .18s,color .18s;white-space:pre}
+pre.pseudo .ln.hot{
+  background:rgba(255,92,122,.16);color:#fff;
+  box-shadow:inset 3px 0 0 var(--red);
+}
+pre.pseudo .ln.hot::after{content:"  ◀";color:var(--red);font-size:.72em}
+.code-note{
+  font-family:var(--mono);font-size:.78rem;color:var(--muted);
+  margin-top:9px;border-top:1px dashed var(--line);padding-top:8px;min-height:2.2em;
+}
+
+/* ---------- 自测 ---------- */
+.quiz-head{margin:32px 0 14px;font-size:1.05rem;color:#dbe4f8}
+.quiz details{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:10px;
+}
+.quiz summary{cursor:pointer;font-weight:600;color:#e6ecfb;font-size:.94rem}
+.quiz summary::marker{color:var(--blue)}
+.quiz details[open] summary{color:var(--blue);margin-bottom:8px}
+.quiz p{margin:8px 0 0;color:#c7d2ea;font-size:.92rem}
+
+/* ---------- 来源 / 页脚 ---------- */
+.src{
+  margin-top:30px;padding:16px 18px;border-radius:12px;
+  background:rgba(255,255,255,.03);border:1px solid var(--line);
+}
+.src h4{margin:0 0 8px;font-size:.94rem;color:#dbe4f8}
+.src p{font-size:.86rem;color:var(--muted);margin:0 0 8px}
+.foot{
+  max-width:1180px;margin:40px auto 0;padding:20px 26px 46px;
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  color:var(--dim);font-size:.84rem;border-top:1px solid var(--line-soft);
+}
+
+/* ---------- 滚动入场 ---------- */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="scroll-progress"><span id="scroll-bar"></span></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <span>Fast-Planner 前端</span>
+    <span class="brand-sub">Lecture 8 · 交互图解</span>
+  </div>
+  <nav class="topnav" id="topnav">
+    <a href="#why">为什么</a>
+    <a href="#framework">总框架</a>
+    <a href="#search">搜索对比</a>
+    <a href="#primitives">原语</a>
+    <a href="#cost">代价</a>
+    <a href="#heuristic">启发式</a>
+    <a href="#flow">全流程</a>
+    <a href="#summary">小结</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top">
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <p class="eyebrow">Classic Local Planning Frameworks for Mobile Robots · 移动机器人经典局部规划框架</p>
+    <h1>把一条<em>“四旋翼真的飞得出来”</em>的轨迹搜出来</h1>
+    <p class="lede">
+      Fast-Planner 分成两半：<b class="c-blue">前端</b>用 Hybrid A* 在<b>连续状态空间</b>里快速搜出一条动力学可行的初始轨迹；
+      <b class="c-teal">后端</b>再对这条轨迹做梯度下降优化与时间调整。
+      这个页面只讲前端 —— 但把每一步都做成可以动手的演示。
+    </p>
+    <div class="chips">
+      <span class="chip"><b>Hybrid A*</b> 前端搜索</span>
+      <span class="chip">状态 <b>x = [p, v] ∈ R<sup>6</sup></b></span>
+      <span class="chip">控制 <b>u = a ∈ R<sup>3</sup></b></span>
+      <span class="chip">候选原语 <b>(2r+1)<sup>3</sup></b></span>
+      <span class="chip">实测限速 <b>2.5 m/s</b></span>
+      <span class="chip">限加速度 <b>1.5 m/s²</b></span>
+    </div>
+    <div class="hero-note">
+      <b>怎么用：</b>每个章节左侧是“人话解释 + 结论”，右侧是可以拖滑块、点按钮的演示。
+      公式推导被省略，但<b>每一条结论都保留</b>，并在公式卡里给出可直接引用的形式。
+      <span class="pgtag">对应讲稿 P1–P15</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 为什么 ============ -->
+<section class="section" id="why">
+  <div class="sec-head">
+    <h2><span class="num">01</span> 为什么需要“前端”这一步？</h2>
+    <span class="pgtag">P2 · P3 · P5</span>
+  </div>
+
+  <div class="cols">
+    <div class="prose">
+      <p>
+        Fast-Planner 能在<b>未知森林</b>、<b>室内杂乱房间</b>、<b>室外树林</b>里做高速自主飞行：
+        讲稿里的实测条件是<b class="c-orange">速度上限 2.5 m/s</b>、<b class="c-orange">加速度上限 1.5 m/s²</b>，视频<b>没有加速播放</b>。
+        这意味着规划器必须在<b>毫秒级</b>给出结果，而且给出的轨迹要真的能被控制器跟踪。
+      </p>
+      <p>
+        传统 A* 只回答一个问题：<i>“栅格地图上哪条路最短？”</i>
+        它不知道四旋翼有惯性、加速度有上限、转弯要提前减速。
+        你把它搜出来的折线路径直接丢给控制器，结果就是——要么飞不出来，要么疯狂抖动。
+      </p>
+      <p>
+        所以 Fast-Planner 把规划拆成两段职责：
+      </p>
+      <ul class="tick">
+        <li><b class="c-blue">前端（Front-End）</b>：用 <b>Hybrid A*</b> 在<b>满足运动动力学约束</b>的连续状态空间里搜一条<b>粗糙但可行</b>的初始轨迹。要快，不要求最优。</li>
+        <li><b class="c-teal">后端（Back-End）</b>：把这条初始轨迹当作初值，做梯度下降式轨迹优化 + 迭代时间调整，把它磨成平滑、动力学更优的轨迹。</li>
+      </ul>
+      <div class="callout">
+        <span class="callout-tag">一句话结论</span>
+        前端的产出 = <b>一条无碰撞、满足动力学约束的初始轨迹</b>。<br>
+        它不是最终答案，它是后端的<b>起点</b>。前端搜得越快越“靠谱”，后端就越不容易陷进坏解。
+      </div>
+
+      <div class="card">
+        <h4>讲稿 P3 视频画面上的文字（实验条件）</h4>
+        <ul class="tick">
+          <li>Aggressive autonomous flight in an unknown forest —— 未知森林中的激进自主飞行</li>
+          <li>Indoor Flight: Scene 1, Trial 1, Play Speed 1X —— 室内试飞，视频未加速</li>
+          <li>Outdoor Flight: Forest 1, Trial 1, Play Speed 1X —— 室外森林试飞，视频未加速</li>
+          <li>Trajectory and map visualization；Red curve: executing trajectory —— 红色曲线是正在执行的轨迹</li>
+          <li>Velocity Limit: 2.5 m/s；Acceleration Limit: 1.5 m/s² —— 速度与加速度上限</li>
+        </ul>
+        <p>
+          这些条件合起来说明一件事：前端要在<b>未知环境</b>里、用接近极限的机动能力<b>实时</b>给出可行轨迹。
+          所以它追求的是“<b>快而可行</b>”，不是“最优”—— 最优化留给后端。
+        </p>
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h3>“折线路径”与“可飞轨迹”的差别</h3>
+      <canvas id="cv-intuition" class="mini-canvas" height="240" aria-label="折线路径与可飞轨迹对比"></canvas>
+      <p class="hint">蓝虚线：栅格最短路，拐角处要求速度瞬间反向 —— 物理上做不到。<br>红线：满足加速度上限的轨迹，拐弯是提前减速画出来的弧。</p>
+      <div class="kv">
+        <div><span>状态维度</span><b>6</b></div>
+        <div><span>控制维度</span><b>3</b></div>
+        <div><span>每节点原语</span><b>(2r+1)³</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 总框架 ============ -->
+<section class="section" id="framework">
+  <div class="sec-head">
+    <h2><span class="num">02</span> 总体框架：前端一次，后端反复</h2>
+    <span class="pgtag">P4</span>
+  </div>
+
+  <div class="cols">
+    <div class="canvas-card wide">
+      <div class="canvas-head">
+        <h3>Fast-Planner 框架流程图（可重放）</h3>
+        <div class="canvas-actions">
+          <button class="btn" id="pipe-play">▶ 重放流程</button>
+        </div>
+      </div>
+      <canvas id="cv-pipeline" height="300" aria-label="Fast-Planner 框架流程图"></canvas>
+      <p class="hint">
+        注意后端是一个<b>内循环</b>：算代价与梯度 → 梯度下降 → 更新曲线，转几轮之后才做<b>迭代时间调整</b>。
+        前端只跑一次，却是整条链路的“起跑线”。
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3>两条流水线各自的职责</h3>
+      <div class="card c-blue-border">
+        <h4>① Front-End · Hybrid A*</h4>
+        <p>运动动力学路径搜索（Kinodynamic Path Searching）。在连续状态空间里离散地前向扩展，得到一条<b>安全且动力学可行</b>的初始轨迹。</p>
+        <p class="mono">x = [p<sup>T</sup>, v<sup>T</sup>]<sup>T</sup> ∈ R<sup>6</sup> ,&nbsp; u = a ∈ [−u<sub>max</sub>, u<sub>max</sub>]<sup>3</sup></p>
+      </div>
+      <div class="card c-teal-border">
+        <h4>② Back-End · Trajectory Optimization</h4>
+        <p>把初始轨迹参数化为多项式/样条，反复执行：</p>
+        <ul class="tick">
+          <li>calculate cost and gradient —— 计算代价与梯度</li>
+          <li>gradient descent —— 梯度下降</li>
+          <li>update curve —— 更新曲线</li>
+        </ul>
+        <p>收敛后再做 <b>Iterative Time Adjustment</b>（迭代时间调整），让轨迹在时间分配上也动力学可行。</p>
+      </div>
+      <div class="callout small">
+        <span class="callout-tag">记住这个分工</span>
+        前端决定<b>“走哪条大方向”</b>，后端决定<b>“怎么走得漂亮”</b>。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 搜索对比 ============ -->
+<section class="section" id="search">
+  <div class="sec-head">
+    <h2><span class="num">03</span> A* 与 Hybrid A*：同一个起点，两种走法</h2>
+    <span class="pgtag">P5 · P6 · P7 · P15</span>
+  </div>
+
+  <p class="sec-lede">
+    下面左右两块是<b>同一张地图、同一个起点和终点</b>，同时开始搜索。左边是普通 A*，一步一个格子；
+    右边是 Hybrid A*，一步是一条<b>恒定加速度画出来的曲线</b>。点播放，看两者差别。
+  </p>
+
+  <div class="controls">
+    <button class="btn primary" id="search-play">▶ 播放</button>
+    <button class="btn" id="search-step">单步</button>
+    <button class="btn" id="search-reset">↺ 重置</button>
+    <label class="ctrl-inline">速度
+      <input type="range" id="search-speed" min="1" max="24" step="1" value="2">
+      <output id="search-speed-out">2×</output>
+    </label>
+    <label class="ctrl-inline checkbox">
+      <input type="checkbox" id="search-tree" checked> 显示搜索树
+    </label>
+    <label class="ctrl-inline checkbox">
+      <input type="checkbox" id="search-cost" checked> 显示代价标注
+    </label>
+  </div>
+
+  <div class="compare">
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>A* <span class="tag gray">栅格搜索</span></h3>
+        <span class="pgtag">P6 左</span>
+      </div>
+      <canvas id="cv-astar" height="380" aria-label="A* 栅格搜索演示"></canvas>
+      <div class="statbar" id="astar-stats"></div>
+      <p class="hint">扩展的邻居固定为 8 个方向；路径是格子到格子的折线，<b>拐角处速度会突变</b>。</p>
+    </div>
+
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>Hybrid A* <span class="tag blue">运动动力学搜索</span></h3>
+        <span class="pgtag">P6 右 · P7 · P15</span>
+      </div>
+      <canvas id="cv-hybrid" height="380" aria-label="Hybrid A* 运动动力学搜索演示"></canvas>
+      <div class="statbar" id="hybrid-stats"></div>
+      <p class="hint">
+        扩展的是<b>运动原语</b>：每步给一个恒定加速度、持续 τ，再积分状态方程得到一条曲线，<b>曲线天然满足加速度上限</b>。
+        蓝色细线是已经生成的原语树，橙色是<b>本轮</b>生成的候选原语，
+        <b class="c-purple">紫色虚线</b>那一段是 AnalyticExpand 的“临门一脚”——它不是一步步搜出来的，
+        而是用第 06 节的边值最优轨迹直接解出来的。
+      </p>
+      <p class="hint mono">
+        演示参数：u<sub>max</sub>=2.0 m/s²，τ=0.9 s，限速 2.5 m/s，2r+1=5 → 每节点 25 条原语；ρ=0.5。
+        启发式按公式计算，演示中乘了 1.25 的权重以加快收敛（weighted A* 风格，前端本来也不追求最优）。
+      </p>
+    </div>
+  </div>
+
+  <div class="code-grid">
+    <div class="code-card">
+      <h4>普通 A* 伪代码 <span class="pgtag">P6 左</span></h4>
+      <pre class="pseudo" id="pseudo-astar">
+<span class="ln" data-l="1">Loop:</span>
+<span class="ln" data-l="2">  if P.empty() → return FALSE</span>
+<span class="ln" data-l="3">  n ← P.pop()   // f(n) = g(n) + h(n) 最小</span>
+<span class="ln" data-l="4">  mark n as expanded</span>
+<span class="ln" data-l="5">  if n is goal → return TRUE</span>
+<span class="ln" data-l="6">  for each unexpanded neighbor m of n:</span>
+<span class="ln" data-l="7">    if g(m) = ∞ :</span>
+<span class="ln" data-l="8">      g(m) = g(n) + C_nm ;  P.push(m)</span>
+<span class="ln" data-l="9">    else if g(m) &gt; g(n) + C_nm :</span>
+<span class="ln" data-l="10">      g(m) = g(n) + C_nm</span>
+<span class="ln" data-l="11">End Loop</span></pre>
+      <div class="code-note" id="astar-note">等待开始…</div>
+    </div>
+
+    <div class="code-card">
+      <h4>Algorithm 1: Kinodynamic Path Searching <span class="pgtag">P7</span></h4>
+      <pre class="pseudo" id="pseudo-hybrid">
+<span class="ln" data-l="1">Initialize();</span>
+<span class="ln" data-l="2">while ¬P.empty() do</span>
+<span class="ln" data-l="3">  n_c ← P.pop(); C.insert(n_c);</span>
+<span class="ln" data-l="4">  if ReachGoal(n_c) ∨ AnalyticExpand(n_c) then</span>
+<span class="ln" data-l="5">    return RetrievePath();</span>
+<span class="ln" data-l="6">  primitives ← Expand(n_c);</span>
+<span class="ln" data-l="7">  nodes ← Prune(primitives);</span>
+<span class="ln" data-l="8">  for n_i in nodes do</span>
+<span class="ln" data-l="9">    if ¬C.contain(n_i) ∧ CheckFeasible(n_i) then</span>
+<span class="ln" data-l="10">      g_temp ← n_c.g_c + EdgeCost(n_i);</span>
+<span class="ln" data-l="11">      if ¬P.contain(n_i) then</span>
+<span class="ln" data-l="12">        P.add(n_i);</span>
+<span class="ln" data-l="13">      else if g_temp ≥ n_i.g_c then</span>
+<span class="ln" data-l="14">        continue;</span>
+<span class="ln" data-l="15">      n_i.parent ← n_c; n_i.g_c ← g_temp;</span>
+<span class="ln" data-l="16">      n_i.f_c ← n_i.g_c + Heuristic(n_i);</span>
+<span class="ln" data-l="17">return RetrievePath();</span></pre>
+      <div class="code-note" id="hybrid-note">等待开始…</div>
+    </div>
+  </div>
+
+  <div class="cols tight">
+    <div class="card">
+      <h4>逐项对照</h4>
+      <table class="tbl">
+        <thead><tr><th></th><th>A*</th><th>Hybrid A*</th></tr></thead>
+        <tbody>
+          <tr><td>搜索空间</td><td>离散栅格节点</td><td>连续状态 (p, v)</td></tr>
+          <tr><td>扩展什么</td><td>固定的 8 个邻居</td><td>运动原语 primitives</td></tr>
+          <tr><td>边代价</td><td>C<sub>nm</sub>：步长 / √2·步长</td><td>EdgeCost = (‖u<sub>d</sub>‖²+ρ)τ</td></tr>
+          <tr><td>启发式</td><td>欧氏 / 八向距离</td><td>两点边值最优控制的最小代价</td></tr>
+          <tr><td>额外检查</td><td>几乎只有碰撞</td><td>CheckFeasible：动力学 + 碰撞 + 速度上限</td></tr>
+          <tr><td>额外技巧</td><td>—</td><td>Prune 剪枝、AnalyticExpand 解析扩展直达终点</td></tr>
+          <tr><td>输出</td><td>折线路径</td><td>动力学可行的光滑初始轨迹</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h4>代码里那几个“新面孔”在干什么</h4>
+      <ul class="tick">
+        <li><b>Expand(n_c)</b>：从当前状态生成一批运动原语（下一节动手看）。</li>
+        <li><b>Prune(primitives)</b>：把落到同一个离散栅格里的原语只留最便宜的一条 —— 这是让连续空间搜索不至于爆炸的关键。</li>
+        <li><b>CheckFeasible(n_i)</b>：动力学可达？不超速？不撞障碍？三者缺一不可。</li>
+        <li><b>ReachGoal(n_c)</b>：状态已经贴近终点。</li>
+        <li><b>AnalyticExpand(n_c)</b>：不再一步步扩展，直接<b>解析地</b>尝试连到终点；成功就结束搜索（演示里能看到这一步的“临门一脚”）。</li>
+        <li><b>Heuristic(n_i)</b>：见第 06 节，它不是欧氏距离。</li>
+      </ul>
+      <div class="callout small">
+        <span class="callout-tag">P 与 C 是什么</span>
+        <b>P</b> 是 open list（优先队列），<b>C</b> 是 closed set。第 13–14 行说的是：如果这个节点已经在队列里，而且新算出来的代价并不更优，就跳过 —— 和 A* 的松弛操作一个意思。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 原语 ============ -->
+<section class="section" id="primitives">
+  <div class="sec-head">
+    <h2><span class="num">04</span> 运动原语：Hybrid A* 的“一步”长什么样</h2>
+    <span class="pgtag">P8 · P9 · P10 · P11</span>
+  </div>
+
+  <p class="sec-lede">
+    前端每扩展一次，就是站在当前状态上，往各个方向“试一脚油门”，各自积分一小段时间。
+    这一小段轨迹就叫做一个 <b>primitive</b>（运动原语）。
+  </p>
+
+  <div class="cols">
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>原语发射台</h3>
+        <span class="pgtag">P10 · P11</span>
+      </div>
+      <canvas id="cv-primitives" height="340" aria-label="运动原语生成演示"></canvas>
+      <div class="panel-inline">
+        <label class="ctrl">最大加速度 u<sub>max</sub>
+          <input type="range" id="prim-umax" min="0.5" max="3" step="0.1" value="2">
+          <output id="prim-umax-out">2.0 m/s²</output>
+        </label>
+        <label class="ctrl">每轴离散档数 r
+          <input type="range" id="prim-r" min="1" max="4" step="1" value="2">
+          <output id="prim-r-out">2</output>
+        </label>
+        <label class="ctrl">起点初速度 v<sub>0</sub>（+x 方向）
+          <input type="range" id="prim-v0" min="0" max="3" step="0.5" value="2.5">
+          <output id="prim-v0-out">2.5 m/s</output>
+        </label>
+        <div class="readout">
+          <span>每轴 <b id="prim-axis">5</b> 档</span>
+          <span>二维原语 <b id="prim-count">25</b> 条</span>
+          <span>三维原语 <b id="prim-count-3d">125</b> 条</span>
+        </div>
+        <button class="btn" id="prim-replay">↻ 重新发射</button>
+      </div>
+      <p class="hint">
+        每条彩色曲线 = 一个恒定加速度输入持续 τ = 0.9 s 的结果（与第 03 节搜索演示同一套参数）。颜色越暖代表 ‖u‖ 越大。
+        这就是第 03 节右侧搜索里“一步”的真身。
+      </p>
+      <p class="hint">
+        把 <b>v<sub>0</sub></b> 从 0 拖大：初速度为零时原语是直线；一旦有了初速度，
+        <b>p(t) = p<sub>0</sub> + v<sub>0</sub>t + ½u t²</b> 就画成了抛物线 ——
+        这正是“状态里必须同时包含位置和速度”的原因：同样的加速度，从不同速度出发会走出不同的曲线。
+      </p>
+    </div>
+
+    <div class="prose">
+      <h3>结论卡片（推导略，结论必记）</h3>
+
+      <div class="card">
+        <h4>① 轨迹被写成多项式</h4>
+        <div class="formula">
+          p(t) := [p<sub>x</sub>(t), p<sub>y</sub>(t), p<sub>z</sub>(t)]<sup>T</sup><br>
+          p<sub>μ</sub>(t) = Σ<sub>k=0..K</sub> a<sub>k</sub> t<sup>k</sup>, &nbsp; μ ∈ {x, y, z}
+        </div>
+        <p>三个轴各自独立地用一个多项式表示。比如 K = 2、μ = x 时就是 p<sub>x</sub>(t) = a<sub>0</sub> + a<sub>1</sub>t + a<sub>2</sub>t²。</p>
+      </div>
+
+      <div class="card">
+        <h4>② 四旋翼在这套框架里就是一个线性时不变（LTI）系统</h4>
+        <div class="formula">
+          x(t) := [p(t)<sup>T</sup>, ṗ(t)<sup>T</sup>, …, p<sup>(n−1)</sup>(t)<sup>T</sup>]<sup>T</sup> ⊂ R<sup>3n</sup><br>
+          u(t) := p<sup>(n)</sup>(t) ∈ U := [−u<sub>max</sub>, u<sub>max</sub>]<sup>3</sup> ⊂ R<sup>3</sup>
+        </div>
+        <p>
+          状态里装着位置和它的各阶导数（直到 n−1 阶），控制输入就是位置的<b>第 n 阶导数</b>，并且被限制在立方体 [−u<sub>max</sub>, u<sub>max</sub>]³ 里。
+        </p>
+      </div>
+
+      <div class="card">
+        <h4>③ 状态方程：给定初值和控制，未来状态是确定的</h4>
+        <div class="formula">
+          x(t) = e<sup>At</sup> x(0) + ∫<sub>0</sub><sup>t</sup> e<sup>A(t−τ)</sup> B u(τ) dτ
+        </div>
+        <p>
+          这行式子的意义就是：<b>只要知道初始状态 x(0) 和这一段的控制输入 u(τ)，整段轨迹的末状态就算得出来</b>。
+          所以“试一脚油门 + 积分一次”= 得到一个候选状态节点，这就是原语。
+        </p>
+      </div>
+
+      <div class="card highlight">
+        <h4>④ 离散化：每轴 2r+1 档，三轴组合出 (2r+1)³ 条原语</h4>
+        <div class="formula">
+          {−u<sub>max</sub>, −(r−1)/r·u<sub>max</sub>, …, (r−1)/r·u<sub>max</sub>, u<sub>max</sub>} &nbsp;→&nbsp; 每轴 2r+1 个值<br>
+          组合数 = (2r+1)<sup>3</sup>
+        </div>
+        <p>
+          每个轴上的控制量均匀地切成 2r+1 档（含 0），三轴一组合就有 (2r+1)³ 个候选控制输入；
+          每个候选持续 τ 时间、积分一次状态方程，就长出一条原语。
+        </p>
+      </div>
+
+      <div class="card c-orange-border">
+        <h4>⑤ Fast-Planner 的具体取值：n = 2</h4>
+        <div class="formula">
+          x = [p<sup>T</sup>, ṗ<sup>T</sup>]<sup>T</sup> = [p<sub>x</sub>, p<sub>y</sub>, p<sub>z</sub>, v<sub>x</sub>, v<sub>y</sub>, v<sub>z</sub>]<sup>T</sup> ∈ R<sup>6</sup><br>
+          u = p<sup>(2)</sup> = [a<sub>x</sub>, a<sub>y</sub>, a<sub>z</sub>]<sup>T</sup> ∈ R<sup>3</sup>
+        </div>
+        <p>
+          状态是<b>位置 + 速度（6 维）</b>，控制是<b>加速度（3 维）</b>。
+          换句话说：<b>一条原语 = 恒定加速度保持 τ 秒</b>，轨迹是二次多项式，在二维平面上就是一条抛物线（左侧演示正是这么画的）。
+          演示里的速度上限 2.5 m/s 就对应真实实验的限速。
+        </p>
+      </div>
+
+      <div class="callout">
+        <span class="callout-tag">想一想</span>
+        r 越大，原语越密、轨迹越精细，但每扩展一个节点要算 (2r+1)³ 条轨迹。
+        <b>r 其实是“搜索精度”和“实时性”之间的那个旋钮</b> —— 把上面的滑块从 1 拖到 4，看候选数量怎么涨（r=1 → 27 条，r=4 → 729 条，涨了 27 倍）。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 代价 ============ -->
+<section class="section" id="cost">
+  <div class="sec-head">
+    <h2><span class="num">05</span> 代价：什么样的“一步”算便宜？</h2>
+    <span class="pgtag">P12</span>
+  </div>
+
+  <div class="cols">
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>代价拆解器</h3>
+        <span class="pgtag">P12</span>
+      </div>
+      <canvas id="cv-cost" height="300" aria-label="原语代价演示"></canvas>
+      <div class="panel-inline">
+        <label class="ctrl">当前原语的加速度 |u|
+          <input type="range" id="cost-u" min="0" max="3" step="0.1" value="1.5">
+          <output id="cost-u-out">1.5</output>
+        </label>
+        <label class="ctrl">持续时间 τ
+          <input type="range" id="cost-tau" min="0.2" max="2" step="0.1" value="1">
+          <output id="cost-tau-out">1.0</output>
+        </label>
+        <label class="ctrl">惩罚项 ρ
+          <input type="range" id="cost-rho" min="0" max="2" step="0.1" value="0.5">
+          <output id="cost-rho-out">0.5</output>
+        </label>
+        <div class="readout">
+          <span>单条原语 e<sub>c</sub> = <b id="cost-ec">—</b></span>
+          <span>不含 ρ：‖u‖²τ = <b id="cost-ec-bare">—</b></span>
+          <span>5 段总代价 g<sub>c</sub> = <b id="cost-gc">—</b></span>
+        </div>
+      </div>
+      <p class="hint">
+        拖动加速度：代价按 <b>平方</b> 增长 —— 这解释了为什么搜索天然偏好“温柔”的轨迹。
+        调大 ρ：相当于给“每一步的时间”额外收费，促使搜索<b>少走步数</b>。
+      </p>
+    </div>
+
+    <div class="prose">
+      <div class="card">
+        <h4>单条原语的代价</h4>
+        <div class="formula">e<sub>c</sub> = ( ‖u<sub>d</sub>‖² + ρ ) · τ</div>
+        <p>
+          ‖u<sub>d</sub>‖² 是这条原语所用控制输入的平方范数（加速度越大越贵，而且是平方级地贵）；
+          ρ 是附加惩罚项；再乘上原语的持续时间 τ。直觉上就是：<b>“猛踩油门”要付钱，“磨时间”也要付钱</b>。
+        </p>
+      </div>
+      <div class="card">
+        <h4>一条 J 段轨迹的真实代价</h4>
+        <div class="formula">g<sub>c</sub> = Σ<sub>j=1..J</sub> ( ‖(u<sub>d</sub>)<sub>j</sub>‖² + ρ ) · τ</div>
+        <p>
+          把路径上所有原语的代价加起来，就是这条轨迹从起点走到当前的<b>实际代价</b>
+          （伪代码里的注释写得很清楚：actual cost of an optimal trajectory from the start state to the current state）。
+        </p>
+      </div>
+      <div class="card">
+        <h4>它在伪代码里的位置 <span class="pgtag">P12 · P14 红框</span></h4>
+        <pre class="pseudo small">
+<span class="ln hot">g_temp ← n_c.g_c + EdgeCost(n_i);</span>
+<span class="ln">if ¬P.contain(n_i) then P.add(n_i);</span>
+<span class="ln">else if g_temp ≥ n_i.g_c then continue;</span>
+<span class="ln hot">n_i.parent ← n_c;  n_i.g_c ← g_temp;</span>
+<span class="ln hot">n_i.f_c ← n_i.g_c + Heuristic(n_i);</span></pre>
+        <p>
+          <b>g_temp</b>：如果经由当前节点 n<sub>c</sub> 走到新节点 n<sub>i</sub>，实际代价会是多少。<br>
+          <b>更优就更新</b>：把 n<sub>i</sub> 的父节点改成 n<sub>c</sub>、g<sub>c</sub> 改成 g_temp，顺便刷新 f<sub>c</sub> = g<sub>c</sub> + Heuristic。<br>
+          <b>不小于就 continue</b>：这条更差的走法直接丢掉。
+        </p>
+      </div>
+      <div class="callout small">
+        <span class="callout-tag">一句话结论</span>
+        搜索在做的其实是<b>最小化这个累加代价</b>；A* 的 f = g + h 在这里变成 f<sub>c</sub> = g<sub>c</sub> + Heuristic，其中 h 由下一节的边值问题给出。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 启发式 ============ -->
+<section class="section" id="heuristic">
+  <div class="sec-head">
+    <h2><span class="num">06</span> 启发式代价：不用欧氏距离，而是解一个最优控制问题</h2>
+    <span class="pgtag">P13 · P14</span>
+  </div>
+
+  <p class="sec-lede">
+    如果启发式只是“到终点的直线距离”，它会完全无视动力学：明明需要先减速再转向，它却以为可以直接冲过去。
+    Fast-Planner 的做法是：<b>求解一个两点边值最优控制问题</b>，把它的最优代价直接当作启发式。
+  </p>
+
+  <div class="cols">
+    <div class="prose">
+      <div class="card">
+        <h4>问题设定</h4>
+        <p>给定当前状态 (p<sub>μc</sub>, ν<sub>μc</sub>) 和目标状态 (p<sub>μg</sub>, ν<sub>μg</sub>)，在所有能把前者送到后者的轨迹里，找那条使代价 T(T) 最小的。工具是 <b>Pontryagin 最小原理</b>，结果是一个三次多项式：</p>
+        <div class="formula">
+          p(t) = a<sub>3</sub>t<sup>3</sup> + a<sub>2</sub>t<sup>2</sup> + a<sub>1</sub>t + a<sub>0</sub>
+        </div>
+        <p>边界条件：</p>
+        <div class="formula">
+          p(0) = p<sub>μc</sub>, &nbsp; ṗ(0) = ν<sub>μc</sub><br>
+          p(T) = p<sub>μg</sub>, &nbsp; ṗ(T) = ν<sub>μg</sub>
+        </div>
+      </div>
+
+      <div class="card highlight">
+        <h4>最优轨迹的闭式解（结论必记）</h4>
+        <div class="formula">
+          p<sub>μ</sub>*(t) = (1/6) α<sub>μ</sub> t<sup>3</sup> + (1/2) β<sub>μ</sub> t<sup>2</sup> + ν<sub>μc</sub> t + p<sub>μc</sub>
+        </div>
+        <div class="formula">
+          [α<sub>μ</sub> ; β<sub>μ</sub>] = (1/T<sup>3</sup>) · [ −12&nbsp;&nbsp;6T ; 6T&nbsp;&nbsp;−2T<sup>2</sup> ] · [ p<sub>μg</sub> − p<sub>μc</sub> − ν<sub>μc</sub>T ; ν<sub>μg</sub> − ν<sub>μc</sub> ]
+        </div>
+        <p>把 α、β 代回去，得到控制输入（加速度）：</p>
+        <div class="formula">
+          a<sub>μ</sub>*(t) = α<sub>μ</sub> t + β<sub>μ</sub> &nbsp;⟹&nbsp; u(t) = [a<sub>x</sub>(t), a<sub>y</sub>(t), a<sub>z</sub>(t)]<sup>T</sup>
+        </div>
+        <p class="emph">
+          结论：最优加速度随时间<b>线性变化</b>（不是常数）—— 这是这套启发式最值得记住的特征，左侧演示里那条红色直线就是它。
+        </p>
+      </div>
+
+      <div class="card">
+        <h4>最后一步：在时间上找最优的 T</h4>
+        <p>把 α、β 代进代价函数，得到只关于 T 的函数（记作 J(T)）：</p>
+        <div class="formula">
+          J(T) = ∫<sub>0</sub><sup>T</sup> ‖u(t)‖² dt + ρ·T
+        </div>
+        <ul class="tick">
+          <li>求根：∂J(T)/∂T = 0；</li>
+          <li>在候选根里挑<b>使代价最小、并且轨迹可行</b>的那个，记作 <b>T<sub>h</sub></b>；</li>
+          <li>把 <b>J(T<sub>h</sub>)</b> 当作启发式值，于是 f<sub>c</sub> ← g<sub>c</sub> + Heuristic(n<sub>i</sub>)。</li>
+        </ul>
+        <div class="formula">Heuristic(n<sub>i</sub>) = J(T<sub>h</sub>)</div>
+        <p class="emph">
+          注意代价里除了 ∫u²dt，还有一个<b>时间惩罚 ρT</b> —— 它和第 05 节边代价 e<sub>c</sub> = (‖u<sub>d</sub>‖²+ρ)τ 用的是同一个 ρ。
+          少了这一项，“慢慢飞”永远更便宜，代价会随 T 单调递减，最优时间 T<sub>h</sub> 根本不存在（演示里把 ρ 拖到 0 就能看到这个退化）。
+        </p>
+      </div>
+
+      <div class="callout">
+        <span class="callout-tag">为什么这样做更好</span>
+        这个启发式<b>本身就是一条满足边界条件的动力学可行轨迹的代价</b>，所以它比欧氏距离“更懂物理”，
+        搜索时更少被无关方向吸引。<br>
+        注意 T 太小会<b>无解</b>（短时间内到不了），演示里会直接提示你。
+      </div>
+    </div>
+
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>两点边值求解器</h3>
+        <span class="pgtag">P13 · P14</span>
+      </div>
+      <canvas id="cv-heur" height="320" aria-label="最优轨迹与线性加速度"></canvas>
+      <canvas id="cv-heur-cost" height="220" aria-label="代价随 T 变化与最优 T"></canvas>
+      <div class="panel-inline">
+        <label class="ctrl">假设的飞行时间 T
+          <input type="range" id="heur-t" min="0.2" max="8" step="0.02" value="1">
+          <output id="heur-t-out">1.00 s</output>
+        </label>
+        <label class="ctrl">代价里的时间权重 ρ
+          <input type="range" id="heur-rho" min="0" max="3" step="0.1" value="2">
+          <output id="heur-rho-out">2.0</output>
+        </label>
+        <label class="ctrl">到目标的距离 Δp
+          <input type="range" id="heur-dp" min="1" max="10" step="0.5" value="5">
+          <output id="heur-dp-out">5.0 m</output>
+        </label>
+        <label class="ctrl">目标速度 v<sub>g</sub>
+          <input type="range" id="heur-dv" min="-2" max="2" step="0.25" value="0">
+          <output id="heur-dv-out">0.00 m/s</output>
+        </label>
+        <button class="btn primary" id="heur-auto">⚡ 自动吸附到最优 T</button>
+        <div class="readout">
+          <span>α = <b id="heur-alpha">—</b></span>
+          <span>β = <b id="heur-beta">—</b></span>
+          <span>最优时间 T<sub>h</sub> = <b id="heur-th-out">—</b></span>
+          <span>启发式 T*(T<sub>h</sub>) = <b id="heur-tstar-out">—</b></span>
+        </div>
+        <div class="status" id="heur-status">拖动滑块开始求解…</div>
+      </div>
+      <p class="hint">
+        上图：蓝线是位置 p(t)，红线是加速度 a(t) = αt + β —— 注意它是<b>直线</b>。
+        下图：橙点是最优点 T<sub>h</sub>，红点是你拖到的 T。左右拖动，看代价曲线怎么被“顶”起来。
+      </p>
+      <p class="hint">
+        演示里额外加了一条<b>加速度上限 a<sub>max</sub> = 5 m/s²</b> 作为可行性检查（对应算法里的 CheckFeasible）：
+        T 取得太小，连接两点所需的加速度就会超限，这一段就被判为不可行 —— 于是最优时间常被“顶”到可行域的边界上。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 全流程 ============ -->
+<section class="section" id="flow">
+  <div class="sec-head">
+    <h2><span class="num">07</span> 把前端串起来：一次 Hybrid A* 到底做了什么</h2>
+    <span class="pgtag">P15</span>
+  </div>
+
+  <div class="cols">
+    <div class="prose">
+      <ol class="steps">
+        <li><b>弹出最便宜的节点</b> n<sub>c</sub> ← P.pop()：优先队列里 f = g + h 最小的那个。</li>
+        <li><b>判断到达</b>：ReachGoal(n<sub>c</sub>) 或 AnalyticExpand(n<sub>c</sub>) 成功 → RetrievePath() 回溯路径，搜索结束。</li>
+        <li><b>扩展原语</b> primitives ← Expand(n<sub>c</sub>)：生成 (2r+1)³ 条候选（Fast-Planner 里是恒定加速度保持 τ）。</li>
+        <li><b>剪枝</b> nodes ← Prune(primitives)：同一栅格只留最便宜的一条，控制分支数量。</li>
+        <li><b>可行性检查</b> CheckFeasible：动力学是否可达、是否超速、是否碰到障碍。</li>
+        <li><b>算边代价</b> g_temp = n_c.g_c + EdgeCost(n_i)，用 (‖u_d‖²+ρ)τ 累加。</li>
+        <li><b>松弛更新</b>：新节点入队；已在队列里且新代价更优就更新父节点、g<sub>c</sub>，然后刷新 f<sub>c</sub> = g<sub>c</sub> + Heuristic(n<sub>i</sub>)。</li>
+        <li><b>循环</b>回到第 1 步，直到抵达终点或队列为空。</li>
+      </ol>
+      <div class="callout">
+        <span class="callout-tag">前端交付物</span>
+        一条<b>满足运动动力学约束、无碰撞的初始轨迹</b>，随后交给后端做轨迹优化与迭代时间调整。
+      </div>
+    </div>
+
+    <div class="canvas-card">
+      <div class="canvas-head">
+        <h3>再跑一次完整流程</h3>
+      </div>
+      <canvas id="cv-pipeline2" height="380" aria-label="前端完整流程演示"></canvas>
+      <p class="hint">
+        这张图把“前端”放大：起点状态 → 弹出最优点 → 生成原语 → 剪枝/检查 → 更新 g、f → 循环 → 抵达终点 → 输出初始轨迹。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 小结 ============ -->
+<section class="section" id="summary">
+  <div class="sec-head">
+    <h2><span class="num">08</span> 小结 · 必记结论清单</h2>
+    <span class="pgtag">全篇</span>
+  </div>
+
+  <div class="grid-cards">
+    <div class="card mini">
+      <h4>模型</h4>
+      <p>四旋翼 = LTI 系统；状态 x 含位置及其到 n−1 阶导数（3n 维），控制 u = p<sup>(n)</sup>，限幅 [−u<sub>max</sub>, u<sub>max</sub>]³。</p>
+    </div>
+    <div class="card mini">
+      <h4>Fast-Planner 取值</h4>
+      <p>n = 2：x = [p, v] ∈ R<sup>6</sup>，u = a ∈ R<sup>3</sup>。原语 = 恒定加速度持续 τ。</p>
+    </div>
+    <div class="card mini">
+      <h4>状态方程</h4>
+      <p>x(t) = e<sup>At</sup>x(0) + ∫e<sup>A(t−τ)</sup>Bu(τ)dτ —— 有初值和控制就能推未来状态。</p>
+    </div>
+    <div class="card mini">
+      <h4>离散化</h4>
+      <p>每轴 2r+1 档 → 共 (2r+1)³ 条原语。r 是精度与实时性的旋钮。</p>
+    </div>
+    <div class="card mini">
+      <h4>代价</h4>
+      <p>e<sub>c</sub> = (‖u<sub>d</sub>‖²+ρ)τ，g<sub>c</sub> = Σ e<sub>c</sub>，f<sub>c</sub> = g<sub>c</sub> + Heuristic。</p>
+    </div>
+    <div class="card mini">
+      <h4>启发式</h4>
+      <p>两点边值最优控制的最小代价：三次多项式轨迹，a*(t) = αt + β 线性；∂T*/∂T = 0 得 T<sub>h</sub>，Heuristic = T*(T<sub>h</sub>)。</p>
+    </div>
+    <div class="card mini">
+      <h4>两个关键技巧</h4>
+      <p>Prune 剪枝【同一栅格留最便宜】 + AnalyticExpand 解析扩展【临门一脚直达终点】。</p>
+    </div>
+    <div class="card mini">
+      <h4>分工</h4>
+      <p>前端一次搜索出初始轨迹；后端反复优化 + 迭代时间调整。前端要快，不要最优。</p>
+    </div>
+  </div>
+
+  <h3 class="quiz-head">自测：点开看答案</h3>
+  <div class="quiz">
+    <details>
+      <summary>Q1：为什么 Hybrid A* 每扩展一个节点要算 (2r+1)³ 条轨迹，而不是 8 条？</summary>
+      <p>因为它扩展的不是固定方向的栅格邻居，而是<b>离散化的控制输入</b>：三个轴各 2r+1 档，组合数是 (2r+1)³。每条候选控制输入持续 τ 时间、积分一次状态方程，得到一条运动学可行的曲线 —— 代价是计算量大，收益是轨迹天然符合动力学约束。</p>
+    </details>
+    <details>
+      <summary>Q2：为什么启发式不用欧氏距离？</summary>
+      <p>欧氏距离无视动力学：它假设可以瞬时改变速度方向。Hybrid A* 用的启发式是<b>两点边值最优控制问题的最优代价</b>，它本身就是一条满足边界条件（当前位置/速度 → 目标位置/速度）的可行轨迹的代价，因此更贴近真实剩余代价，指导搜索更有效。</p>
+    </details>
+    <details>
+      <summary>Q3：Prune 这一步行不行？删掉了原语不会漏掉最优解吗？</summary>
+      <p>会牺牲一部分最优性，但换来可接受的计算量。Prune 把落在同一个离散栅格（位置+速度量化后）的原语只保留代价最小的一条，避免大量“几乎一样”的节点同时进入 open list。前端的目标本来就是<b>快速拿到一条可行初始轨迹</b>，精细的最优性由后端优化负责。</p>
+    </details>
+    <details>
+      <summary>Q4：为什么最优加速度 a*(t) = αt + β 会是线性的？</summary>
+      <p>在“最小控制代价 + 固定端点位置与速度”的两点边值问题里，用 Pontryagin 最小原理得到的最优控制是时间的一次函数；位置则是它的二次积分，也就是三次多项式 p(t) = (1/6)αt³ + (1/2)βt² + ν<sub>c</sub>t + p<sub>c</sub>。α、β 由边界条件解出，只与 Δp、Δv 和 T 有关。</p>
+    </details>
+    <details>
+      <summary>Q5：启发式的代价里为什么必须有时间项 ρT？</summary>
+      <p>因为 ∫‖u‖²dt 只惩罚“控制量”：T 越大，连接同样两点所需的加速度越小、这一项越低。<b>如果只有它，代价会随 T 单调递减</b>——“慢慢飞”永远更便宜，∂J/∂T = 0 没有有限根，也就谈不上“最优时间 T<sub>h</sub>”。加上 ρT 之后“磨时间”也要付费，才出现真正的极小点。这正是边代价 e<sub>c</sub> = (‖u<sub>d</sub>‖²+ρ)τ 里那个 ρ 存在的理由 —— <b>搜索与启发式用的是同一个代价口径</b>。把第 06 节的 ρ 拖到 0，就能看到这个退化。</p>
+    </details>
+  </div>
+
+  <div class="src">
+    <h4>内容来源与线索对照</h4>
+    <p>
+      本页依据讲稿 <b>Lecture 8 · Classic Local Planning Frameworks for Mobile Robots</b>（深蓝学院，主讲 Qianhao Wang，浙江大学）整理：
+      <span class="mono">L8 sec1 Fast Planner前端.pdf</span> 的 P1–P15。
+      视频素材为同目录下的 <span class="mono">45-2.mp4</span>、<span class="mono">46-2/3/4.mp4</span>、<span class="mono">47.mp4</span>、<span class="mono">48-2.mp4</span>、<span class="mono">49.mp4</span>、<span class="mono">50.mp4</span>（示例飞行画面未嵌入本页）。
+      Fast-Planner 原始文献在讲稿中标注为 [1]。
+    </p>
+    <p class="small muted">
+      说明：本页为学习用的交互图解，公式推导过程被有意省略，只保留结论与直觉；所有数值演示均为按上述公式当场计算的示意，不代表论文实验数据。
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <span>Fast-Planner 前端 · Hybrid A* 运动动力学搜索 · 交互教学页</span>
+  <a href="#top">回到顶部 ↑</a>
+</footer>
+
+<script>
+/* ===== ui.js ===== */
+/* ============================================================
+   ui.js —— 页面通用交互：阅读进度、导航高亮、滚动入场
+   （传统 script，无模块化，可直接 file:// 打开）
+   ============================================================ */
+(function () {
+  'use strict';
+
+  /* ---------- 阅读进度条 ---------- */
+  function initProgress() {
+    var bar = document.getElementById('scroll-bar');
+    if (!bar) return;
+    function update() {
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      var p = h > 0 ? (window.scrollY / h) * 100 : 0;
+      bar.style.width = Math.max(0, Math.min(100, p)) + '%';
+    }
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    update();
+  }
+
+  /* ---------- 导航当前章节高亮 ---------- */
+  function initNav() {
+    var links = Array.prototype.slice.call(document.querySelectorAll('#topnav a'));
+    if (!links.length || !('IntersectionObserver' in window)) return;
+
+    var map = {};
+    var targets = [];
+    links.forEach(function (a) {
+      var id = a.getAttribute('href').slice(1);
+      var el = document.getElementById(id);
+      if (el) { map[id] = a; targets.push(el); }
+    });
+
+    var visible = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting ? e.intersectionRatio : 0; });
+      var best = null, bestVal = 0;
+      Object.keys(visible).forEach(function (id) {
+        if (visible[id] > bestVal) { bestVal = visible[id]; best = id; }
+      });
+      links.forEach(function (a) { a.classList.remove('active'); });
+      if (best && map[best]) map[best].classList.add('active');
+    }, { rootMargin: '-15% 0px -55% 0px', threshold: [0.02, 0.15, 0.4, 0.75] });
+
+    targets.forEach(function (t) { io.observe(t); });
+  }
+
+  /* ---------- 滚动入场动画 ---------- */
+  function initReveal() {
+    var els = Array.prototype.slice.call(document.querySelectorAll('.section .card, .section .canvas-card, .section .side-card'));
+    if (!els.length) return;
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return; // 直接显示，不做动画
+    }
+    els.forEach(function (el, i) {
+      el.classList.add('reveal');
+      el.style.transitionDelay = Math.min(i % 4, 3) * 60 + 'ms';
+    });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { rootMargin: '0px 0px -40px 0px', threshold: 0.05 });
+    els.forEach(function (el) { io.observe(el); });
+  }
+
+  /* ---------- 共享工具：画布是否在视口附近 ----------
+     页面上有 6 个常驻 rAF 循环、9 块画布，全部一直重绘会让滚动发卡。
+     各动画模块用这个函数在画布离开视口时跳过绘制（margin 为提前量，px）。
+     返回一个 getter：true 表示当前应当绘制。 */
+  window.dshOnScreen = function (el, margin) {
+    var visible = true;
+    if (!el || !('IntersectionObserver' in window)) return function () { return true; };
+    margin = margin === undefined ? 150 : margin;
+    var io = new IntersectionObserver(function (entries) {
+      for (var i = 0; i < entries.length; i++) visible = entries[i].isIntersecting;
+    }, { rootMargin: margin + 'px 0px ' + margin + 'px 0px' });
+    io.observe(el);
+    // 初始状态：还没回调过时按“可见”处理，避免首帧空白
+    return function () { return visible; };
+  };
+
+  /* ---------- 共享工具：把 canvas 尺寸写入缓存，只在真的变化时重设 ----------
+     两个坑：
+     1) 直接给 canvas.width 赋值会清空画布并重建后备存储，每帧都做会明显掉帧，
+        而且读 clientWidth 会强制同步布局 → 所以只在尺寸真的变化时写。
+     2) canvas.height 是“反射属性”，赋值会同时改写 HTML 的 height 属性。
+        如果每次都重新读 getAttribute('height') 当设计高度，在 devicePixelRatio > 1 时
+        每一帧都会把设计高度乘上 dpr，画布指数级变高（页面被一直拉长，最后白屏）。
+        因此设计高度只在第一次读属性，之后一直用缓存值。 */
+  window.dshFitCanvas = function (cv, fixedH) {
+    var dpr = window.devicePixelRatio || 1;
+    if (!(dpr > 0)) dpr = 1;
+    var w = cv.clientWidth || 520;
+    // 设计高度：优先显式传入，其次用首次读到的属性值并永久记住
+    var h = fixedH || cv.__designH;
+    if (!h) {
+      h = parseFloat(cv.getAttribute('height')) || 300;
+      cv.__designH = h;
+    }
+    if (!(w > 2)) w = 520;
+
+    var bw = Math.round(w * dpr);
+    var bh = Math.round(h * dpr);
+    // 保险：后备缓冲高度绝不超出设计高度的 4 倍（防止任何意外导致的爆炸式增长）
+    if (bh > h * 4) bh = Math.round(h * 4);
+
+    if (cv.__bw !== bw || cv.__bh !== bh) {
+      cv.width = bw; cv.height = bh;
+      cv.__bw = bw; cv.__bh = bh;
+    }
+    if (cv.__sh !== h) { cv.style.height = h + 'px'; cv.__sh = h; }
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h, dpr: dpr };
+  };
+
+  /* ---------- 共享工具：是否应当减少动效 ---------- */
+  window.dshReducedMotion = function () {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  };
+
+  function init() { initProgress(); initNav(); initReveal(); }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== intuition.js ===== */
+/* ============================================================
+   intuition.js —— 第 01 节的小演示
+   对比：栅格折线“路径” vs 满足加速度上限的“可飞轨迹”
+   结论：折线在拐角处要求速度瞬间反向，物理上飞不出来；
+        可飞轨迹必须在拐弯前减速，所以它更慢、更长，但能真的飞出来。
+
+   动画约定：
+   - 一个周期 = SWEEP（两者从起点跑到终点）+ HOLD（停在终点并淡出）
+   - 蓝球：在折线上匀速前进
+   - 红球：按“曲率越大越慢”的时间表前进 —— 拐角处明显被拖慢，
+          因此全程会落在蓝球后面。这正是本节想让人看到的差别。
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var C = {
+    grid: '#1c2743', axis: '#24304f', ink: '#e8ecf8', muted: '#9aa7c7',
+    blue: '#4ea1ff', teal: '#39e0b0', orange: '#ffb454', red: '#ff5c7a'
+  };
+
+  var SWEEP = 4200;   // 从起点跑到终点（ms）
+  var HOLD = 900;     // 到终点后停留（ms），期间淡出
+  var K_TURN = 30;    // 转弯惩罚系数：越大，红球在拐角处被拖得越慢
+
+  function fit(cv) {
+    if (window.dshFitCanvas) return window.dshFitCanvas(cv);   // 带尺寸缓存，避免每帧重建后备存储
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || 600;
+    // 设计高度只读一次属性：给 canvas.height 赋值会改写该属性，反复读会随 dpr 指数变高
+    var h = cv.__designH || parseFloat(cv.getAttribute('height')) || 240;
+    cv.__designH = h;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.height = h + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  // 折线路径（格子里“最短”的走法：先横再竖，带直角弯）
+  var POLY = [[0.08, 0.78], [0.30, 0.78], [0.30, 0.30], [0.55, 0.30], [0.55, 0.62], [0.88, 0.62]];
+
+  // 可飞轨迹：对折点做多轮加权平滑（等效于给拐角留出转弯半径）
+  function smoothPath() {
+    var pts = [];
+    for (var i = 0; i < POLY.length - 1; i++) {
+      var a = POLY[i], b = POLY[i + 1], n = 26;
+      for (var k = 0; k < n; k++) { pts.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); }
+    }
+    pts.push(POLY[POLY.length - 1]);
+    for (var pass = 0; pass < 26; pass++) {
+      var out = [pts[0]];
+      for (var j = 1; j < pts.length - 1; j++) {
+        out.push([
+          pts[j][0] * 0.5 + (pts[j - 1][0] + pts[j + 1][0]) * 0.25,
+          pts[j][1] * 0.5 + (pts[j - 1][1] + pts[j + 1][1]) * 0.25
+        ]);
+      }
+      out.push(pts[pts.length - 1]);
+      pts = out;
+    }
+    return pts;
+  }
+
+  function arcLen(pts) {
+    var L = [0], s = 0;
+    for (var i = 1; i < pts.length; i++) {
+      s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      L.push(s);
+    }
+    return L;
+  }
+
+  function at(pts, L, u) {          // 按弧长比例 u ∈ [0,1] 取点
+    var target = u * L[L.length - 1];
+    for (var i = 1; i < L.length; i++) {
+      if (L[i] >= target) {
+        var t = (target - L[i - 1]) / Math.max(1e-9, L[i] - L[i - 1]);
+        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t,
+                pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t];
+      }
+    }
+    return pts[pts.length - 1];
+  }
+
+  /* 按曲率造一张“时间表”：转弯处单位弧长花费的时间更多。
+     返回归一化到 [0,1] 的累计时间数组 T（与 pts 等长）。 */
+  function timeWarp(pts) {
+    var T = [0], acc = 0;
+    for (var i = 1; i < pts.length; i++) {
+      var ds = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      // 局部转角：前后两段方向之差
+      var turn = 0;
+      if (i >= 2) {
+        var a1 = Math.atan2(pts[i - 1][1] - pts[i - 2][1], pts[i - 1][0] - pts[i - 2][0]);
+        var a2 = Math.atan2(pts[i][1] - pts[i - 1][1], pts[i][0] - pts[i - 1][0]);
+        turn = Math.abs(a2 - a1);
+      }
+      acc += ds * (1 + K_TURN * turn);      // 转得越多，越慢
+      T.push(acc);
+    }
+    var total = acc || 1;
+    for (var k = 0; k < T.length; k++) T[k] /= total;
+    return T;
+  }
+
+  /* 按“时间比例”取点：在时间表 T 上反查位置 */
+  function atTime(pts, T, w) {
+    if (w <= 0) return pts[0];
+    if (w >= 1) return pts[pts.length - 1];
+    var lo = 0, hi = T.length - 1;
+    while (hi - lo > 1) {
+      var mid = (lo + hi) >> 1;
+      if (T[mid] <= w) lo = mid; else hi = mid;
+    }
+    var span = Math.max(1e-9, T[hi] - T[lo]);
+    var t = (w - T[lo]) / span;
+    return [pts[lo][0] + (pts[hi][0] - pts[lo][0]) * t,
+            pts[lo][1] + (pts[hi][1] - pts[lo][1]) * t];
+  }
+
+  function init() {
+    var cv = document.getElementById('cv-intuition');
+    if (!cv) return;
+
+    var smooth = smoothPath();
+    var Tw = timeWarp(smooth);
+    var Lp = arcLen(POLY), Ls = arcLen(smooth);
+    // 拐角在平滑轨迹上的位置（用于“减速”提示）
+    var cornerU = [[0.30, 0.78], [0.30, 0.30], [0.55, 0.30], [0.55, 0.62]].map(function (c) {
+      var bestD = 1e9, bestU = 0;
+      for (var k = 0; k < smooth.length; k++) {
+        var d = Math.hypot(smooth[k][0] - c[0], smooth[k][1] - c[1]);
+        if (d < bestD) { bestD = d; bestU = Tw[k]; }
+      }
+      return bestU;
+    });
+
+    var onScreen = window.dshOnScreen ? window.dshOnScreen(cv, 200) : function () { return true; };
+    var reduced = window.dshReducedMotion ? window.dshReducedMotion() : false;
+    var t0 = performance.now();
+
+    function draw() {
+      var f = fit(cv), ctx = f.ctx, W = f.w, H = f.h;
+      var m = 26, gw = W - m * 2, gh = H - m * 2;
+      var X = function (x) { return m + x * gw; };
+      var Y = function (y) { return m + y * gh; };
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0d1428'; ctx.fillRect(0, 0, W, H);
+
+      // 栅格
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+      for (var i = 0; i <= 10; i++) {
+        ctx.beginPath(); ctx.moveTo(X(i / 10), Y(0)); ctx.lineTo(X(i / 10), Y(1)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(X(0), Y(i / 10)); ctx.lineTo(X(1), Y(i / 10)); ctx.stroke();
+      }
+
+      // 障碍
+      ctx.fillStyle = 'rgba(255,180,84,.16)';
+      ctx.strokeStyle = 'rgba(255,180,84,.55)';
+      ctx.beginPath(); ctx.rect(X(0.38), Y(0.02), X(0.12) - X(0), Y(0.22) - Y(0)); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.rect(X(0.66), Y(0.44), X(0.14) - X(0), Y(0.30) - Y(0)); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X(0.20), Y(0.42), Math.max(10, gw * 0.045), 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // 折线路径（栅格最短路）
+      ctx.save();
+      ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.strokeStyle = C.blue;
+      ctx.beginPath();
+      POLY.forEach(function (p, i) { i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])); });
+      ctx.stroke();
+      ctx.restore();
+      POLY.slice(1, -1).forEach(function (p) {
+        ctx.fillStyle = C.blue;
+        ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 3.2, 0, Math.PI * 2); ctx.fill();
+      });
+
+      // 可飞轨迹
+      ctx.lineWidth = 2.6; ctx.strokeStyle = C.red;
+      ctx.beginPath();
+      smooth.forEach(function (p, i) { i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])); });
+      ctx.stroke();
+
+      // 起点终点
+      ctx.fillStyle = C.teal;
+      ctx.beginPath(); ctx.arc(X(POLY[0][0]), Y(POLY[0][1]), 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.orange;
+      var g = POLY[POLY.length - 1];
+      ctx.beginPath(); ctx.arc(X(g[0]), Y(g[1]), 5, 0, Math.PI * 2); ctx.fill();
+
+      /* ---------- 动画进度 ----------
+         一个周期：SWEEP 内从起点跑到终点，之后 HOLD 停留并淡出。
+         之前那版把 0→1 在半个周期里跑了两次，小球会在周期中间“瞬移”回起点，
+         这里改成单次推进 + 淡入淡出，衔接不再跳。 */
+      var ms = reduced ? SWEEP : (performance.now() - t0);
+      var cyc = SWEEP + HOLD;
+      var ph = ms % cyc;
+      var w = Math.min(1, ph / SWEEP);
+      var alpha = 1;
+      if (ph > SWEEP) {
+        alpha = 1 - (ph - SWEEP) / HOLD;                 // 停留期间淡出
+      } else if (ph < 260) {
+        alpha = ph / 260;                                 // 起步淡入
+      }
+      alpha = Math.max(0, Math.min(1, alpha));
+
+      // 蓝球：折线上匀速
+      var pb = at(POLY, Lp, w);
+      // 红球：按时间表前进（拐角自动变慢，全程落后于蓝球）
+      var pr = atTime(smooth, Tw, w);
+
+      if (alpha > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = C.blue;
+        ctx.beginPath(); ctx.arc(X(pb[0]), Y(pb[1]), 5.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = C.red;
+        ctx.beginPath(); ctx.arc(X(pr[0]), Y(pr[1]), 5.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // 红球是否正处在某个拐角的“减速段”
+      var slowing = cornerU.some(function (cu) { return Math.abs(w - cu) < 0.075; });
+
+      /* ---------- 文字：窄画布自动换行，不再固定偏移 ---------- */
+      ctx.font = '12px system-ui, "Microsoft YaHei", sans-serif';
+      var t1 = 'A* 折线路径（拐角速度突变）';
+      var t2 = '动力学可行轨迹（拐弯前减速）';
+      var w1 = ctx.measureText(t1).width, w2 = ctx.measureText(t2).width;
+      if (w1 + w2 + 26 <= W - m * 2) {                    // 一行放得下
+        ctx.fillStyle = C.blue; ctx.fillText(t1, m, H - 8);
+        ctx.fillStyle = C.red; ctx.fillText(t2, W - m - w2, H - 8);
+      } else {                                            // 放不下就分两行
+        ctx.fillStyle = C.blue; ctx.fillText(t1, m, H - 26);
+        ctx.fillStyle = C.red; ctx.fillText(t2, m, H - 10);
+      }
+
+      if (slowing && alpha > 0.3) {
+        var label = '拐弯处减速';
+        var lw = ctx.measureText(label).width;
+        var lx = Math.min(W - m - lw - 10, Math.max(m, X(pr[0]) + 12));
+        var ly = Math.max(m + 14, Y(pr[1]) - 10);
+        ctx.save();
+        ctx.fillStyle = 'rgba(13,20,40,.85)';
+        ctx.fillRect(lx - 5, ly - 12, lw + 12, 18);
+        ctx.strokeStyle = 'rgba(255,180,84,.5)'; ctx.lineWidth = 1;
+        ctx.strokeRect(lx - 5.5, ly - 12.5, lw + 13, 19);
+        ctx.fillStyle = C.orange;
+        ctx.fillText(label, lx + 1, ly + 1);
+        ctx.restore();
+      }
+
+      return true;
+    }
+
+    function loop() {
+      // 画布离开视口时不再重绘：页面上有 6 个这样的循环，全开会让滚动发卡
+      if (onScreen()) draw();
+      requestAnimationFrame(loop);
+    }
+
+    if (reduced) { draw(); return; }   // 系统设置“减少动效”时只画一帧静止画面
+    draw();                            // 先无条件画一帧，保证画布不会因为还没进视口而空白
+    loop();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== framework.js ===== */
+/* ============================================================
+   framework.js —— 第 02 节 与 第 07 节的流程图动画
+   ① #cv-pipeline ：Fast-Planner 总框架（前端一次、后端内循环、时间调整）
+   ② #cv-pipeline2：把前端放大成 8 步循环
+   纯 Canvas 绘制，无外部依赖，file:// 可直接运行。
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var C = {
+    box: '#18223f', boxHi: '#1f2f56', line: '#2b3a5e', ink: '#e8ecf8',
+    muted: '#9aa7c7', dim: '#6f7c9c', blue: '#4ea1ff', teal: '#39e0b0',
+    orange: '#ffb454', red: '#ff5c7a', purple: '#a78bfa'
+  };
+
+  function fit(cv) {
+    if (window.dshFitCanvas) return window.dshFitCanvas(cv);   // 带尺寸缓存：不再每帧重建后备存储
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || 700;
+    // 设计高度只读一次属性：给 canvas.height 赋值会改写该属性，反复读会随 dpr 指数变高
+    var h = cv.__designH || parseFloat(cv.getAttribute('height')) || 300;
+    cv.__designH = h;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.height = h + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function arrow(ctx, x1, y1, x2, y2, color, dashed, dashOffset) {
+    var head = 7, ang = Math.atan2(y2 - y1, x2 - x1);
+    ctx.save();
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.6;
+    if (dashed) {
+      ctx.setLineDash([5, 4]);
+      // 让虚线流动起来：即使流程停在某个盒子里，画面也一直在动，不会像“卡住”
+      if (dashOffset) ctx.lineDashOffset = -dashOffset;
+    }
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(ang) * head * 0.8, y2 - Math.sin(ang) * head * 0.8); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - Math.cos(ang - 0.4) * head, y2 - Math.sin(ang - 0.4) * head);
+    ctx.lineTo(x2 - Math.cos(ang + 0.4) * head, y2 - Math.sin(ang + 0.4) * head);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function label(ctx, text, cx, cy, color, size, weight, maxW) {
+    var s = size || 12;
+    var font = (w) => (weight || 500) + ' ' + w + 'px system-ui, "Microsoft YaHei", sans-serif';
+    ctx.font = font(s);
+    // 窄画布上自动缩字，避免文字溢出盒子
+    if (maxW) {
+      while (s > 8 && ctx.measureText(text).width > maxW) { s -= 0.5; ctx.font = font(s); }
+    }
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, cy);
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
+  /* ============================================================
+     ① 总框架流程图
+     ============================================================ */
+  function initPipeline() {
+    var cv = document.getElementById('cv-pipeline');
+    var btn = document.getElementById('pipe-play');
+    if (!cv) return;
+
+    var start = 0, dwell = 0;
+    var seq = null; // 由 buildSeq 生成
+
+    function buildSeq(W, H) {
+      // 归一化布局 → 像素
+      var boxes = {
+        start:   { x: 0.02, y: 0.34, w: 0.13, h: 0.32 },
+        front:   { x: 0.18, y: 0.28, w: 0.20, h: 0.44 },
+        back:    { x: 0.42, y: 0.06, w: 0.31, h: 0.88 },
+        inner1:  { x: 0.44, y: 0.20, w: 0.27, h: 0.16 },
+        inner2:  { x: 0.44, y: 0.42, w: 0.27, h: 0.16 },
+        inner3:  { x: 0.44, y: 0.64, w: 0.27, h: 0.16 },
+        timeadj: { x: 0.76, y: 0.10, w: 0.22, h: 0.32 },
+        out:     { x: 0.76, y: 0.56, w: 0.22, h: 0.32 }
+      };
+      Object.keys(boxes).forEach(function (k) {
+        var b = boxes[k];
+        b.px = b.x * W; b.py = b.y * H; b.pw = b.w * W; b.ph = b.h * H;
+        b.cx = b.px + b.pw / 2; b.cy = b.py + b.ph / 2;
+      });
+
+      var s = [];
+      s.push({ to: boxes.start, hold: 500, hot: 'start' });
+      s.push({ to: boxes.front, hold: 900, hot: 'front' });
+      for (var r = 0; r < 3; r++) {           // 后端内循环转 3 轮
+        s.push({ to: boxes.inner1, hold: 380, hot: 'inner1' });
+        s.push({ to: boxes.inner2, hold: 380, hot: 'inner2' });
+        s.push({ to: boxes.inner3, hold: 380, hot: 'inner3' });
+      }
+      s.push({ to: boxes.timeadj, hold: 900, hot: 'timeadj' });
+      s.push({ to: boxes.out, hold: 1100, hot: 'out' });
+      return { boxes: boxes, seq: s };
+    }
+
+    var layout = null;
+    var tStart = performance.now();
+
+    function totalMs() {
+      var t = 0;
+      layout.seq.forEach(function (st) { t += st.hold + 420; });
+      return t + 900;
+    }
+
+    function reset() { tStart = performance.now(); }
+    if (btn) btn.addEventListener('click', reset);
+
+    function draw() {
+      var f = fit(cv), ctx = f.ctx, W = f.w, H = f.h;
+      // 布局只在画布尺寸变化时重算（原来每帧都重建一遍，纯属浪费）
+      if (!layout || layout.W !== W || layout.H !== H) {
+        layout = buildSeq(W, H);
+        layout.W = W; layout.H = H;
+      }
+      var b = layout.boxes;
+      var nowMs = performance.now();
+
+      // 时间轴 → 当前高亮与 token 位置
+      var el = (nowMs - tStart) % totalMs();
+      var curHot = null, token = [b.start.cx, b.start.cy];
+      var prev = [b.start.cx, b.start.cy], placed = false;
+      for (var i = 0; i < layout.seq.length; i++) {
+        var st = layout.seq[i];
+        var target = [st.to.cx, st.to.cy];
+        var travel = 420;
+        if (el < travel) {                       // 正在飞向下一个盒子
+          var k = el / travel;
+          token = [prev[0] + (target[0] - prev[0]) * k, prev[1] + (target[1] - prev[1]) * k];
+          curHot = null;
+          placed = true;
+          break;
+        }
+        el -= travel;
+        if (el < st.hold) {                      // 停在盒子里，高亮它
+          curHot = st.hot;
+          token = target;
+          placed = true;
+          break;
+        }
+        el -= st.hold;
+        prev = target;
+      }
+      if (!placed) { curHot = 'out'; token = [b.out.cx, b.out.cy]; }
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0d1428'; ctx.fillRect(0, 0, W, H);
+
+      // 呼吸脉冲：停留期间盒子也有明暗变化，不会让人以为画面卡住了
+      var pulse = 0.5 + 0.5 * Math.sin(nowMs / 300);
+      var flow = (nowMs / 45) % 9;          // 虚线流动偏移
+
+      // 连线
+      arrow(ctx, b.start.cx + b.start.pw / 2, b.start.cy, b.front.px - 6, b.front.cy, C.line, false, 0);
+      arrow(ctx, b.front.px + b.front.pw, b.front.cy, b.back.px - 6, b.front.cy, C.line, false, 0);
+      arrow(ctx, b.back.px + b.back.pw, b.back.cy, b.timeadj.px - 6, b.timeadj.cy, C.line, false, 0);
+      arrow(ctx, b.timeadj.cx, b.timeadj.py + b.timeadj.ph, b.out.cx, b.out.py - 6, C.line, false, 0);
+      // 内循环箭头（流动虚线，强调“在循环”）
+      arrow(ctx, b.inner1.cx, b.inner1.py + b.inner1.ph, b.inner2.cx, b.inner2.py - 4, C.purple, true, flow);
+      arrow(ctx, b.inner2.cx, b.inner2.py + b.inner2.ph, b.inner3.cx, b.inner3.py - 4, C.purple, true, flow);
+      // 回到顶部（绕左侧）
+      ctx.save();
+      ctx.strokeStyle = C.purple; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.6;
+      ctx.lineDashOffset = -flow;
+      ctx.beginPath();
+      ctx.moveTo(b.inner3.px, b.inner3.cy);
+      ctx.lineTo(b.back.px + 8, b.inner3.cy);
+      ctx.lineTo(b.back.px + 8, b.inner1.cy);
+      ctx.lineTo(b.inner1.px - 4, b.inner1.cy);
+      ctx.stroke(); ctx.restore();
+      // 虚线箭头收尾
+      ctx.fillStyle = C.purple;
+      ctx.beginPath();
+      ctx.moveTo(b.inner1.px, b.inner1.cy);
+      ctx.lineTo(b.inner1.px - 9, b.inner1.cy - 4);
+      ctx.lineTo(b.inner1.px - 9, b.inner1.cy + 4);
+      ctx.closePath(); ctx.fill();
+
+      // 盒子
+      function box(k, title, sub, accent) {
+        var bx = b[k];
+        var hot = curHot === k;
+        ctx.save();
+        roundRect(ctx, bx.px, bx.py, bx.pw, bx.ph, 12);
+        ctx.fillStyle = hot ? C.boxHi : C.box;
+        ctx.fill();
+        ctx.lineWidth = hot ? 2 : 1.2;
+        ctx.strokeStyle = hot ? accent : C.line;
+        if (hot) {
+          ctx.shadowColor = accent;
+          ctx.shadowBlur = 10 + 14 * pulse;                 // 呼吸
+          ctx.globalAlpha = 0.85 + 0.15 * pulse;
+        }
+        ctx.stroke();
+        ctx.restore();
+        var cy = bx.cy - (sub ? 8 : 0);
+        label(ctx, title, bx.cx, cy, hot ? '#fff' : C.ink, Math.max(11, Math.min(14, bx.pw / 11)), 700, bx.pw - 10);
+        if (sub) label(ctx, sub, bx.cx, bx.cy + 11, hot ? accent : C.muted, Math.max(10, Math.min(12, bx.pw / 15)), 400, bx.pw - 8);
+      }
+
+      // 很窄的画布（手机宽度）下才用更短的文案；桌面两栏布局下画布约 560px，完整文案放得下
+      var narrow = W < 520;
+
+      box('start', '起点 / 目标', narrow ? 'x(0) → x(g)' : 'x(0) → x(g)', C.teal);
+      box('front', 'Front-End', 'Hybrid A*', C.blue);
+      // 后端容器（只画描边不上色）
+      ctx.save();
+      roundRect(ctx, b.back.px, b.back.py, b.back.pw, b.back.ph, 14);
+      ctx.strokeStyle = 'rgba(57,224,176,.45)'; ctx.lineWidth = 1.4; ctx.setLineDash([7, 5]); ctx.stroke();
+      ctx.restore();
+      label(ctx, narrow ? 'Back-End' : 'Back-End · Trajectory Optimization',
+            b.back.cx, b.back.py + 15, C.teal, 11.5, 700, b.back.pw - 10);
+      box('inner1', narrow ? 'cost & grad' : 'calculate cost', narrow ? '' : 'and gradient', C.red);
+      box('inner2', narrow ? 'grad descent' : 'gradient descent', '', C.red);
+      box('inner3', 'update curve', '', C.red);
+      box('timeadj', 'Iterative', narrow ? 'Time Adj.' : 'Time Adjustment', C.orange);
+      box('out', '输出轨迹', narrow ? '' : '交给后端/控制器', C.teal);
+
+      // 流动的 token
+      ctx.save();
+      ctx.shadowColor = C.blue; ctx.shadowBlur = 14;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(token[0], token[1], 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      // 角落说明
+      ctx.font = '11px system-ui, "Microsoft YaHei", sans-serif';
+      ctx.fillStyle = C.dim;
+      ctx.fillText('前端只跑一次 → 后端内循环三轮 → 时间调整 → 输出', 10, H - 9);
+    }
+
+    var onScreen = window.dshOnScreen ? window.dshOnScreen(cv, 200) : function () { return true; };
+    var reduced = window.dshReducedMotion ? window.dshReducedMotion() : false;
+    function loop() {
+      if (onScreen()) draw();
+      requestAnimationFrame(loop);
+    }
+    if (reduced) draw(); else { draw(); loop(); }   // 先画一帧，避免画布未进视口时是空白
+  }
+
+  /* ============================================================
+     ② 前端放大：8 步循环
+     ============================================================ */
+  function initFrontEnd() {
+    var cv = document.getElementById('cv-pipeline2');
+    if (!cv) return;
+
+    var NODES = [
+      { t: '1 弹出最优点', s: 'n_c ← P.pop()' },
+      { t: '2 到达判定', s: 'ReachGoal ∨ AnalyticExpand' },
+      { t: '3 生成原语', s: 'Expand(n_c) → (2r+1)³' },
+      { t: '4 剪枝', s: 'Prune(primitives)' },
+      { t: '5 可行性检查', s: 'CheckFeasible：动力学/碰撞/超速' },
+      { t: '6 边代价', s: 'g_temp = g_c + EdgeCost' },
+      { t: '7 松弛更新', s: 'g_c、f_c = g_c + Heuristic' },
+      { t: '8 抵达终点', s: 'RetrievePath() → 初始轨迹' }
+    ];
+
+    var t0 = performance.now();
+    var STEP = 900; // 每步停留
+
+    function draw() {
+      var f = fit(cv), ctx = f.ctx, W = f.w, H = f.h;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#0d1428'; ctx.fillRect(0, 0, W, H);
+
+      var cx = W / 2, cy = H / 2 + 6;
+      var rx = Math.min(W * 0.34, 240), ry = Math.min(H * 0.34, 130);
+      var bw = Math.min(150, W * 0.30), bh = 52;
+
+      var pts = NODES.map(function (n, i) {
+        var a = -Math.PI / 2 + i * (Math.PI * 2 / NODES.length);
+        return { n: n, x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry, a: a };
+      });
+
+      // 环形连线
+      pts.forEach(function (p, i) {
+        var q = pts[(i + 1) % pts.length];
+        ctx.save();
+        ctx.strokeStyle = i === pts.length - 1 ? 'rgba(57,224,176,.55)' : C.line;
+        ctx.lineWidth = 1.4; ctx.setLineDash(i === pts.length - 1 ? [6, 5] : []);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        ctx.restore();
+      });
+
+      // 当前步
+      var nowMs = performance.now();
+      var cyc = (nowMs - t0) % (STEP * NODES.length);
+      var idx = Math.floor(cyc / STEP);
+      var prog = (cyc - idx * STEP) / STEP;
+      var pulse = 0.5 + 0.5 * Math.sin(nowMs / 300);
+
+      // 中心提示
+      label(ctx, 'Hybrid A* 前端循环', cx, cy - 16, C.blue, 13, 700);
+      label(ctx, '第 ' + (idx + 1) + ' / 8 步', cx, cy + 6, C.muted, 11.5, 400);
+      label(ctx, '终点一旦可达即回溯输出', cx, cy + 26, C.dim, 10.5, 400);
+
+      pts.forEach(function (p, i) {
+        var hot = i === idx;
+        var bx = p.x - bw / 2, by = p.y - bh / 2;
+        ctx.save();
+        roundRect(ctx, bx, by, bw, bh, 11);
+        ctx.fillStyle = hot ? '#20315a' : C.box; ctx.fill();
+        ctx.lineWidth = hot ? 2 : 1.2;
+        ctx.strokeStyle = hot ? C.blue : C.line;
+        if (hot) { ctx.shadowColor = C.blue; ctx.shadowBlur = 10 + 12 * pulse; }
+        ctx.stroke();
+        ctx.restore();
+        // 当前节点的进度环：900 ms 走一圈，让“停在这一步”也变得可见地活着
+        if (hot) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(78,161,255,.9)'; ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, Math.max(bw, bh) / 2 + 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+          ctx.stroke();
+          ctx.restore();
+        }
+        label(ctx, p.n.t, p.x, by + 18, hot ? '#fff' : C.ink, 11.5, hot ? 700 : 600, bw - 10);
+        // 副标题（过长则截断）
+        var sub = p.n.s;
+        ctx.font = '10px system-ui, "Microsoft YaHei", sans-serif';
+        var maxW = bw - 12;
+        while (ctx.measureText(sub).width > maxW && sub.length > 4) sub = sub.slice(0, -1);
+        label(ctx, sub, p.x, by + 36, hot ? C.teal : C.dim, 10, 400);
+      });
+
+      // 移动的光点：沿环从当前节点走向下一个
+      var a0 = pts[idx], a1 = pts[(idx + 1) % pts.length];
+      var px = a0.x + (a1.x - a0.x) * prog, py = a0.y + (a1.y - a0.y) * prog;
+      ctx.save();
+      ctx.shadowColor = C.teal; ctx.shadowBlur = 13; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      ctx.font = '11px system-ui, "Microsoft YaHei", sans-serif';
+      ctx.fillStyle = C.dim;
+      ctx.fillText('弹出 → 判定 → 扩展原语 → 剪枝 → 检查 → 代价 → 更新 → 到达', 10, H - 9);
+    }
+
+    var onScreen = window.dshOnScreen ? window.dshOnScreen(cv, 200) : function () { return true; };
+    var reduced = window.dshReducedMotion ? window.dshReducedMotion() : false;
+    function loop() {
+      if (onScreen()) draw();
+      requestAnimationFrame(loop);
+    }
+    if (reduced) draw(); else { draw(); loop(); }   // 先画一帧，避免画布未进视口时是空白
+  }
+
+  function init() { initPipeline(); initFrontEnd(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== search.js ===== */
+/* ============================================================
+   search.js —— 第 03 节核心演示
+   左：普通 A*（栅格搜索，折线路径）
+   右：Hybrid A*（运动动力学搜索，恒定加速度原语 + 代价 + 边值启发式）
+   两侧共用同一张地图、同一个起点与终点，并联动显示 Algorithm 1 伪代码。
+
+   与讲稿的对应关系：
+   - Expand(n_c)      → 对离散控制输入 (2r+1)² 逐个积分状态方程
+   - Prune            → 落在同一离散栅格的原语只留最便宜的一条
+   - CheckFeasible    → 碰撞 + 超速 + 出界
+   - EdgeCost         → e_c = (‖u_d‖² + ρ)τ
+   - Heuristic        → 两点边值最优控制的最小代价（在 T 上扫描求最小值，等价于令 dT/dT = 0 取最小可行根）
+   - AnalyticExpand   → 用该边值最优轨迹直接尝试连到终点
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var C = {
+    bg: '#0d1428', grid: '#1a2540', gridBold: '#22304f', obst: 'rgba(255,180,84,.18)',
+    obstLine: 'rgba(255,180,84,.65)', ink: '#e8ecf8', muted: '#9aa7c7', dim: '#6f7c9c',
+    blue: '#4ea1ff', teal: '#39e0b0', orange: '#ffb454', red: '#ff5c7a', purple: '#a78bfa'
+  };
+
+  /* ---------------- 地图定义（两侧共用） ---------------- */
+  var WORLD = { w: 22, h: 13 };
+  var ROBOT_R = 0.35;
+  var OBST = [
+    { type: 'rect', x: 7.0, y: 0.0, w: 0.8, h: 8.0 },
+    { type: 'rect', x: 11.5, y: 5.0, w: 3.0, h: 2.5 },
+    { type: 'rect', x: 16.5, y: 2.0, w: 0.8, h: 4.0 },
+    { type: 'circle', cx: 10.0, cy: 10.2, r: 1.6 }
+  ];
+  var START = { x: 1.5, y: 2.0 };
+  var GOAL = { x: 20.0, y: 11.0 };
+
+  function pointBlocked(x, y, r) {
+    r = r === undefined ? ROBOT_R : r;
+    for (var i = 0; i < OBST.length; i++) {
+      var o = OBST[i];
+      if (o.type === 'rect') {
+        if (x > o.x - r && x < o.x + o.w + r && y > o.y - r && y < o.y + o.h + r) return true;
+      } else {
+        if (Math.hypot(x - o.cx, y - o.cy) < o.r + r) return true;
+      }
+    }
+    return false;
+  }
+
+  /* ---------------- 画布工具 ---------------- */
+  function fit(cv) {
+    if (window.dshFitCanvas) return window.dshFitCanvas(cv);   // 带尺寸缓存：避免每帧重建后备存储 + 强制布局
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || 520;
+    // 设计高度只读一次属性：给 canvas.height 赋值会改写该属性，反复读会随 dpr 指数变高
+    var h = cv.__designH || parseFloat(cv.getAttribute('height')) || 380;
+    cv.__designH = h;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.height = h + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx: ctx, w: w, h: h };
+  }
+
+  function view(cv) {
+    var f = fit(cv);
+    var pad = 12;
+    var s = Math.min((f.w - pad * 2) / WORLD.w, (f.h - pad * 2) / WORLD.h);
+    var ox = (f.w - WORLD.w * s) / 2;
+    var oy = (f.h - WORLD.h * s) / 2;
+    return {
+      ctx: f.ctx, w: f.w, h: f.h, s: s, ox: ox, oy: oy,
+      X: function (x) { return ox + x * s; },
+      Y: function (y) { return f.h - oy - y * s; }
+    };
+  }
+
+  function drawMapBase(V, showGrid, gridStep) {
+    var ctx = V.ctx;
+    ctx.clearRect(0, 0, V.w, V.h);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, V.w, V.h);
+    if (showGrid) {
+      ctx.lineWidth = 1;
+      for (var x = 0; x <= WORLD.w; x += gridStep) {
+        ctx.strokeStyle = (Math.round(x) % 5 === 0) ? C.gridBold : C.grid;
+        ctx.beginPath(); ctx.moveTo(V.X(x), V.Y(0)); ctx.lineTo(V.X(x), V.Y(WORLD.h)); ctx.stroke();
+      }
+      for (var y = 0; y <= WORLD.h; y += gridStep) {
+        ctx.strokeStyle = (Math.round(y) % 5 === 0) ? C.gridBold : C.grid;
+        ctx.beginPath(); ctx.moveTo(V.X(0), V.Y(y)); ctx.lineTo(V.X(WORLD.w), V.Y(y)); ctx.stroke();
+      }
+    }
+    for (var i = 0; i < OBST.length; i++) {
+      var o = OBST[i];
+      ctx.save();
+      ctx.fillStyle = C.obst; ctx.strokeStyle = C.obstLine; ctx.lineWidth = 1.4;
+      if (o.type === 'rect') {
+        ctx.beginPath();
+        ctx.rect(V.X(o.x), V.Y(o.y + o.h), o.w * V.s, o.h * V.s);
+        ctx.fill(); ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.arc(V.X(o.cx), V.Y(o.cy), o.r * V.s, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawEndpoints(V) {
+    var ctx = V.ctx;
+    ctx.save();
+    ctx.fillStyle = C.teal; ctx.shadowColor = C.teal; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(V.X(START.x), V.Y(START.y), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.orange; ctx.shadowColor = C.orange;
+    ctx.beginPath(); ctx.arc(V.X(GOAL.x), V.Y(GOAL.y), 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.font = '11px system-ui, "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = C.teal; ctx.fillText('Start', V.X(START.x) + 9, V.Y(START.y) + 4);
+    ctx.fillStyle = C.orange; ctx.fillText('Goal', V.X(GOAL.x) - 34, V.Y(GOAL.y) - 10);
+  }
+
+  /* ============================================================
+     一、普通 A*：栅格搜索
+     ============================================================ */
+  var CELL = 0.7, COLS = Math.ceil(WORLD.w / CELL), ROWS = Math.ceil(WORLD.h / CELL);
+
+  function AStar() { this.reset(); }
+
+  AStar.prototype.idx = function (i, j) { return j * COLS + i; };
+  AStar.prototype.cellBlocked = function (i, j) {
+    if (i < 0 || j < 0 || i >= COLS || j >= ROWS) return true;
+    return pointBlocked((i + 0.5) * CELL, (j + 0.5) * CELL);
+  };
+  AStar.prototype.reset = function () {
+    var n = COLS * ROWS, self = this;
+    this.g = new Float64Array(n); this.f = new Float64Array(n);
+    for (var i = 0; i < n; i++) { this.g[i] = Infinity; this.f[i] = Infinity; }
+    this.parent = new Int32Array(n);
+    for (var j = 0; j < n; j++) this.parent[j] = -1;
+    this.state = new Uint8Array(n); // 0 未访问 1 open 2 closed
+    this.heap = [];
+    this.expanded = 0; this.status = 'running'; this.cur = -1; this.path = null; this.phase = '';
+    this.si = Math.floor(START.x / CELL); this.sj = Math.floor(START.y / CELL);
+    this.gi = Math.floor(GOAL.x / CELL); this.gj = Math.floor(GOAL.y / CELL);
+
+    // 起点/终点若正好落在膨胀障碍里，就近找一个自由格子
+    function nearestFree(ci, cj) {
+      if (!self.cellBlocked(ci, cj)) return [ci, cj];
+      for (var rad = 1; rad <= 4; rad++) {
+        for (var dj = -rad; dj <= rad; dj++) {
+          for (var di = -rad; di <= rad; di++) {
+            if (Math.abs(di) !== rad && Math.abs(dj) !== rad) continue;
+            if (!self.cellBlocked(ci + di, cj + dj)) return [ci + di, cj + dj];
+          }
+        }
+      }
+      return [ci, cj];
+    }
+    var sf = nearestFree(this.si, this.sj); this.si = sf[0]; this.sj = sf[1];
+    var gf = nearestFree(this.gi, this.gj); this.gi = gf[0]; this.gj = gf[1];
+
+    var s = this.idx(this.si, this.sj);
+    this.g[s] = 0; this.f[s] = this.h(this.si, this.sj);
+    this.push(s, this.f[s]); this.state[s] = 1;
+  };
+  AStar.prototype.h = function (i, j) {
+    var dx = Math.abs(i - this.gi), dy = Math.abs(j - this.gj);
+    return (Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy)) * CELL;
+  };
+  AStar.prototype.push = function (i, f) {
+    var h = this.heap; h.push({ i: i, f: f });
+    var k = h.length - 1;
+    while (k > 0) {
+      var p = (k - 1) >> 1;
+      if (h[p].f <= h[k].f) break;
+      var t = h[p]; h[p] = h[k]; h[k] = t; k = p;
+    }
+  };
+  AStar.prototype.pop = function () {
+    var h = this.heap;
+    if (!h.length) return -1;
+    var top = h[0], last = h.pop();
+    if (h.length) {
+      h[0] = last;
+      var k = 0;
+      for (;;) {
+        var l = 2 * k + 1, r = l + 1, m = k;
+        if (l < h.length && h[l].f < h[m].f) m = l;
+        if (r < h.length && h[r].f < h[m].f) m = r;
+        if (m === k) break;
+        var t = h[m]; h[m] = h[k]; h[k] = t; k = m;
+      }
+    }
+    return top.i;
+  };
+  AStar.prototype.step = function (k) {
+    if (this.status !== 'running') return this.status;
+    var DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (var s = 0; s < k; s++) {
+      var ci = this.pop();
+      if (ci < 0) { this.status = 'fail'; this.phase = 'fail'; return this.status; }
+      if (this.state[ci] === 2) { s--; continue; }   // 惰性删除的过期条目
+      this.state[ci] = 2;
+      this.expanded++;
+      this.cur = ci;
+      this.phase = 'pop';
+      var i = ci % COLS, j = (ci - i) / COLS;
+      if (i === this.gi && j === this.gj) {
+        this.status = 'done'; this.phase = 'goal'; this.buildPath(); return this.status;
+      }
+      this.phase = 'expand';
+      for (var d = 0; d < DIRS.length; d++) {
+        var ni = i + DIRS[d][0], nj = j + DIRS[d][1];
+        if (this.cellBlocked(ni, nj)) continue;
+        var diag = DIRS[d][0] !== 0 && DIRS[d][1] !== 0;
+        if (diag && (this.cellBlocked(i + DIRS[d][0], j) || this.cellBlocked(i, j + DIRS[d][1]))) continue; // 不许切角
+        var stp = diag ? Math.SQRT2 * CELL : CELL;
+        var t = this.g[ci] + stp;
+        var mi = this.idx(ni, nj);
+        if (t < this.g[mi] - 1e-9) {
+          this.g[mi] = t; this.parent[mi] = ci;
+          this.f[mi] = t + this.h(ni, nj);
+          this.push(mi, this.f[mi]);
+          if (this.state[mi] !== 2) this.state[mi] = 1;
+          this.phase = 'relax';
+        }
+      }
+    }
+    return this.status;
+  };
+  AStar.prototype.buildPath = function () {
+    var pts = [], c = this.idx(this.gi, this.gj);
+    while (c >= 0) {
+      var i = c % COLS, j = (c - i) / COLS;
+      pts.push([(i + 0.5) * CELL, (j + 0.5) * CELL]);
+      c = this.parent[c];
+    }
+    pts.reverse(); this.path = pts;
+  };
+  AStar.prototype.openCount = function () {
+    var n = 0;
+    for (var i = 0; i < this.state.length; i++) if (this.state[i] === 1) n++;
+    return n;
+  };
+  AStar.prototype.draw = function (V) {
+    var ctx = V.ctx;
+    drawMapBase(V, true, CELL);
+    for (var j = 0; j < ROWS; j++) {
+      for (var i = 0; i < COLS; i++) {
+        var st = this.state[this.idx(i, j)];
+        if (st === 0) continue;
+        ctx.fillStyle = st === 2 ? 'rgba(78,161,255,.16)' : 'rgba(57,224,176,.16)';
+        ctx.fillRect(V.X(i * CELL) + 1, V.Y((j + 1) * CELL) + 1, CELL * V.s - 2, CELL * V.s - 2);
+      }
+    }
+    if (this.cur >= 0 && this.status === 'running') {
+      var ci = this.cur % COLS, cj = (this.cur - ci) / COLS;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(V.X((ci + 0.5) * CELL), V.Y((cj + 0.5) * CELL), 3.4, 0, Math.PI * 2); ctx.fill();
+    }
+    if (this.path) {
+      ctx.save();
+      ctx.strokeStyle = C.red; ctx.lineWidth = 2.6; ctx.lineJoin = 'round';
+      ctx.shadowColor = C.red; ctx.shadowBlur = 10;
+      ctx.beginPath();
+      this.path.forEach(function (p, i) { i ? ctx.lineTo(V.X(p[0]), V.Y(p[1])) : ctx.moveTo(V.X(p[0]), V.Y(p[1])); });
+      ctx.stroke(); ctx.restore();
+    }
+    drawEndpoints(V);
+  };
+
+  /* ============================================================
+     二、Hybrid A*：运动动力学搜索
+     ============================================================ */
+  var UMAX = 2.0, TAU = 0.9, RHO = 0.5, R_DISCRETE = 2, VMAX = 2.5;
+  var POS_Q = 0.8, VEL_Q = 2.0;   // 剪枝所用的离散栅格分辨率（位置 / 速度）
+  var H_WEIGHT = 1.25;            // 演示用加权启发式，加快收敛（前端本来也不追求最优）
+  var ANALYTIC_R = 3.0;           // 进入 3 m 内才尝试解析扩展直达终点
+
+  // 两点边值：给定两端位置/速度与时间 T，返回最优控制的 α、β 与控制代价
+  function bvp(pc, vc, pg, vg, T) {
+    var A = pg - pc - vc * T, B = vg - vc, T3 = T * T * T;
+    var alpha = (-12 * A + 6 * T * B) / T3;
+    var beta = (6 * T * A - 2 * T * T * B) / T3;
+    var cost = alpha * alpha * T3 / 3 + alpha * beta * T * T + beta * beta * T;
+    return { alpha: alpha, beta: beta, cost: cost };
+  }
+  function bvpPos(pc, vc, al, be, t) { return pc + vc * t + 0.5 * be * t * t + al * t * t * t / 6; }
+  function bvpVel(vc, al, be, t) { return vc + be * t + 0.5 * al * t * t; }
+
+  // 单轴最小代价：在 T 上扫描 = 求 dT/dT = 0 并挑最小可行根
+  function axisMinCost(pc, vc, pg, vg) {
+    var best = Infinity, bestT = 0;
+    for (var T = 0.08; T <= 5.0; T += 0.04) {
+      var r = bvp(pc, vc, pg, vg, T);
+      if (!isFinite(r.cost) || r.cost <= 0) continue;
+      if (r.cost < best) { best = r.cost; bestT = T; }
+    }
+    return { cost: best, T: bestT };
+  }
+
+  function Hybrid() { this.reset(); }
+
+  Hybrid.prototype.reset = function () {
+    this.nodes = [];
+    this.open = [];             // 二叉堆 {i, f, ver}
+    this.best = new Map();      // 离散栅格 key → {i, g, closed}
+    this.hcache = new Map();    // 状态 key → 启发式值
+    this.expanded = 0; this.generated = 0; this.pruned = 0; this.rejected = 0;
+    this.status = 'running'; this.phase = 'init';
+    this.cur = -1; this.lastBatch = []; this.path = null;
+    this.startNode = { x: START.x, y: START.y, vx: 0, vy: 0, g: 0, parent: -1, ver: 0, pts: [[START.x, START.y]] };
+    this.startNode.f = H_WEIGHT * this.heuristic(this.startNode);
+    this.nodes.push(this.startNode);
+    this.push(0, this.startNode.f, 0);
+    this.best.set(this.key(this.startNode), { i: 0, g: 0, closed: false });
+  };
+  Hybrid.prototype.qkey = function (x, y, vx, vy) {
+    return Math.round(x / POS_Q) + '|' + Math.round(y / POS_Q) + '|' +
+           Math.round(vx / VEL_Q) + '|' + Math.round(vy / VEL_Q);
+  };
+  Hybrid.prototype.key = function (n) { return this.qkey(n.x, n.y, n.vx, n.vy); };
+
+  Hybrid.prototype.heuristic = function (n) {
+    var k = this.qkey(n.x, n.y, n.vx, n.vy);
+    var hit = this.hcache.get(k);
+    if (hit !== undefined) return hit;
+    var v = axisMinCost(n.x, n.vx, GOAL.x, 0).cost + axisMinCost(n.y, n.vy, GOAL.y, 0).cost;
+    if (!isFinite(v) || v <= 0) v = 0.5;
+    this.hcache.set(k, v);
+    return v;
+  };
+  Hybrid.prototype.push = function (i, f, ver) {
+    var h = this.open; h.push({ i: i, f: f, ver: ver });
+    var k = h.length - 1;
+    while (k > 0) {
+      var p = (k - 1) >> 1;
+      if (h[p].f <= h[k].f) break;
+      var t = h[p]; h[p] = h[k]; h[k] = t; k = p;
+    }
+  };
+  Hybrid.prototype.pop = function () {
+    var h = this.open;
+    if (!h.length) return null;
+    var top = h[0], last = h.pop();
+    if (h.length) {
+      h[0] = last;
+      var k = 0;
+      for (;;) {
+        var l = 2 * k + 1, r = l + 1, m = k;
+        if (l < h.length && h[l].f < h[m].f) m = l;
+        if (r < h.length && h[r].f < h[m].f) m = r;
+        if (m === k) break;
+        var t = h[m]; h[m] = h[k]; h[k] = t; k = m;
+      }
+    }
+    return top;
+  };
+
+  // 生成一条原语：恒定加速度 u 保持 TAU 秒，逐步积分状态方程
+  Hybrid.prototype.primitive = function (n, ux, uy) {
+    var pts = [], dt = TAU / 20, x = n.x, y = n.y, vx = n.vx, vy = n.vy, ok = true;
+    pts.push([x, y]);
+    for (var s = 1; s <= 20; s++) {
+      vx += ux * dt; vy += uy * dt;
+      x += vx * dt; y += vy * dt;
+      if (Math.hypot(vx, vy) > VMAX + 1e-6) ok = false;              // 超速 → CheckFeasible 不通过
+      if (x < 0 || y < 0 || x > WORLD.w || y > WORLD.h) ok = false;   // 出界
+      if (ok && pointBlocked(x, y)) ok = false;                       // 碰撞
+      pts.push([x, y]);
+    }
+    var cost = (ux * ux + uy * uy + RHO) * TAU;                        // e_c = (‖u_d‖² + ρ)τ
+    return { pts: pts, x: x, y: y, vx: vx, vy: vy, ux: ux, uy: uy, cost: cost, feasible: ok };
+  };
+
+  // AnalyticExpand：用边值最优轨迹直接连到终点，成功即结束搜索
+  Hybrid.prototype.tryAnalytic = function (n) {
+    var best = null;
+    for (var T = 0.2; T <= 4.0; T += 0.05) {
+      var rx = bvp(n.x, n.vx, GOAL.x, 0, T), ry = bvp(n.y, n.vy, GOAL.y, 0, T);
+      if (!isFinite(rx.cost) || !isFinite(ry.cost)) continue;
+      var total = rx.cost + ry.cost;
+      if (best && total >= best.total) continue;
+      var pts = [], ok = true;
+      for (var s = 0; s <= 14; s++) {
+        var t = T * s / 14;
+        var px = bvpPos(n.x, n.vx, rx.alpha, rx.beta, t);
+        var py = bvpPos(n.y, n.vy, ry.alpha, ry.beta, t);
+        var sp = Math.hypot(bvpVel(n.vx, rx.alpha, rx.beta, t), bvpVel(n.vy, ry.alpha, ry.beta, t));
+        if (sp > VMAX + 1e-6 || pointBlocked(px, py)) { ok = false; break; }
+        pts.push([px, py]);
+      }
+      if (ok) best = { total: total, pts: pts, T: T };
+    }
+    return best;
+  };
+
+  Hybrid.prototype.step = function (k) {
+    if (this.status !== 'running') return this.status;
+    var US = [];
+    for (var d = -R_DISCRETE; d <= R_DISCRETE; d++) US.push(d * UMAX / R_DISCRETE);
+
+    for (var s = 0; s < k; s++) {
+      if (this.expanded > 6000) { this.status = 'fail'; this.phase = 'fail'; return this.status; }
+      var top = this.pop();
+      while (top && this.nodes[top.i].ver !== top.ver) top = this.pop();   // 惰性删除过期条目
+      if (!top) { this.status = 'fail'; this.phase = 'fail'; return this.status; }
+      var nc = this.nodes[top.i];
+      var rec = this.best.get(this.key(nc));
+      if (rec) rec.closed = true;
+      this.cur = top.i; this.expanded++; this.phase = 'pop';
+
+      var dist = Math.hypot(nc.x - GOAL.x, nc.y - GOAL.y);
+      // 4. ReachGoal(n_c) / AnalyticExpand(n_c)
+      this.phase = 'goal';
+      if (dist < 0.9 && Math.hypot(nc.vx, nc.vy) < 0.8) {
+        this.status = 'done'; this.phase = 'goal'; this.buildPath(top.i, null); return this.status;
+      }
+      if (dist < ANALYTIC_R) {
+        var an = this.tryAnalytic(nc);
+        if (an) { this.status = 'done'; this.phase = 'analytic'; this.buildPath(top.i, an.pts); return this.status; }
+      }
+
+      // 6. Expand(n_c)：生成 (2r+1)² 条原语（三维时是 (2r+1)³）
+      this.phase = 'expand';
+      var prims = [];
+      for (var a = 0; a < US.length; a++) {
+        for (var b = 0; b < US.length; b++) {
+          var pr = this.primitive(nc, US[a], US[b]);
+          this.generated++;
+          if (!pr.feasible) { this.rejected++; continue; }   // 9. CheckFeasible
+          prims.push(pr);
+        }
+      }
+      // 7. Prune：落在同一离散栅格的原语只留最便宜的一条
+      this.phase = 'prune';
+      var bag = new Map();
+      for (var i2 = 0; i2 < prims.length; i2++) {
+        var p = prims[i2], pk = this.qkey(p.x, p.y, p.vx, p.vy), prev = bag.get(pk);
+        if (!prev || p.cost < prev.cost) bag.set(pk, p);
+        else this.pruned++;
+      }
+      this.lastBatch = prims;
+
+      // 9~16. 逐个候选：代价 → 入队/更新 → f = g + h
+      var self = this, parentIdx = top.i;
+      this.phase = 'check';
+      bag.forEach(function (p, pk) {
+        self.phase = 'cost';
+        var gtemp = nc.g + p.cost;                          // 10. g_temp ← n_c.g_c + EdgeCost(n_i)
+        var exist = self.best.get(pk);
+        if (exist && exist.g <= gtemp + 1e-9) return;       // 13-14. 不更优就 continue
+        var node, idx;
+        if (exist) {
+          idx = exist.i;
+          node = self.nodes[idx];
+          node.g = gtemp; node.parent = parentIdx; node.pts = p.pts;
+          node.x = p.x; node.y = p.y; node.vx = p.vx; node.vy = p.vy;
+          node.ver = (node.ver || 0) + 1;
+          exist.g = gtemp;
+        } else {
+          node = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, g: gtemp, parent: parentIdx, pts: p.pts, ver: 1 };
+          self.nodes.push(node);
+          idx = self.nodes.length - 1;
+          self.best.set(pk, { i: idx, g: gtemp, closed: false });
+        }
+        self.phase = 'update';
+        node.f = gtemp + H_WEIGHT * self.heuristic(node);   // 16. f_c ← g_c + Heuristic
+        self.push(idx, node.f, node.ver);
+        self.phase = 'heuristic';
+      });
+    }
+    return this.status;
+  };
+
+  Hybrid.prototype.buildPath = function (endIdx, analyticPts) {
+    var pts = [], c = endIdx, guard = 0;
+    while (c >= 0 && guard++ < 3000) {
+      var n = this.nodes[c];
+      for (var i = n.pts.length - 1; i >= 0; i--) pts.push(n.pts[i]);
+      c = n.parent;
+    }
+    pts.reverse();
+    if (analyticPts) {
+      pts = pts.concat(analyticPts);
+      this.analyticIdx = pts.length - analyticPts.length;   // 这一段是 AnalyticExpand 连出来的
+    } else {
+      this.analyticIdx = -1;
+    }
+    this.path = pts;
+  };
+
+  Hybrid.prototype.draw = function (V, showTree, showCost) {
+    var ctx = V.ctx;
+    drawMapBase(V, true, 1.0);
+    if (showTree) {
+      // 本轮生成的候选原语（橙色）
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,180,84,.32)'; ctx.lineWidth = 1;
+      for (var i = 0; i < this.lastBatch.length; i++) {
+        var p = this.lastBatch[i];
+        ctx.beginPath();
+        p.pts.forEach(function (q, k) { k ? ctx.lineTo(V.X(q[0]), V.Y(q[1])) : ctx.moveTo(V.X(q[0]), V.Y(q[1])); });
+        ctx.stroke();
+      }
+      // 已生成的运动原语树（蓝）
+      ctx.strokeStyle = 'rgba(78,161,255,.45)'; ctx.lineWidth = 1.1;
+      for (var j = 1; j < this.nodes.length; j++) {
+        var n = this.nodes[j];
+        if (!n.pts || n.pts.length < 2) continue;
+        ctx.beginPath();
+        n.pts.forEach(function (q, k) { k ? ctx.lineTo(V.X(q[0]), V.Y(q[1])) : ctx.moveTo(V.X(q[0]), V.Y(q[1])); });
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (this.cur >= 0 && this.nodes[this.cur]) {
+      var cn = this.nodes[this.cur];
+      ctx.save();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(V.X(cn.x), V.Y(cn.y), 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      if (showCost) {
+        ctx.font = '11px "Cascadia Mono", Consolas, monospace';
+        var lx = V.X(cn.x) + 9;
+        var need = Math.max(ctx.measureText('g=' + cn.g.toFixed(1)).width, ctx.measureText('f=' + cn.f.toFixed(1)).width);
+        if (lx + need > V.w - 6) lx = V.X(cn.x) - 9 - need;   // 贴右边界时改画在左边
+        ctx.fillStyle = C.teal;
+        ctx.fillText('g=' + cn.g.toFixed(1), lx, V.Y(cn.y) - 8);
+        ctx.fillStyle = C.purple;
+        ctx.fillText('f=' + cn.f.toFixed(1), lx, V.Y(cn.y) + 5);
+      }
+    }
+    if (this.path) {
+      var ai = this.analyticIdx === undefined ? -1 : this.analyticIdx;
+      ctx.save();
+      ctx.lineJoin = 'round';
+      // 搜索出来的部分
+      ctx.strokeStyle = C.red; ctx.lineWidth = 3;
+      ctx.shadowColor = C.red; ctx.shadowBlur = 12;
+      var upto = ai > 0 ? ai : this.path.length - 1;
+      ctx.beginPath();
+      for (var k = 0; k <= upto; k++) {
+        var q = this.path[k];
+        k ? ctx.lineTo(V.X(q[0]), V.Y(q[1])) : ctx.moveTo(V.X(q[0]), V.Y(q[1]));
+      }
+      ctx.stroke();
+      // AnalyticExpand 连到终点的那一段：紫色虚线，说明“临门一脚”不是一步步搜出来的
+      if (ai > 0) {
+        ctx.shadowColor = C.purple; ctx.shadowBlur = 10;
+        ctx.strokeStyle = C.purple; ctx.lineWidth = 2.6; ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        for (var k2 = ai; k2 < this.path.length; k2++) {
+          var q2 = this.path[k2];
+          k2 === ai ? ctx.moveTo(V.X(q2[0]), V.Y(q2[1])) : ctx.lineTo(V.X(q2[0]), V.Y(q2[1]));
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // 图例放在右下角，避免压在搜索树和代价标注上
+        ctx.font = '11px system-ui, "Microsoft YaHei", sans-serif';
+        var lw = ctx.measureText('紫虚线：AnalyticExpand 直达终点').width + 16;
+        ctx.fillStyle = 'rgba(13,20,40,.85)';
+        ctx.fillRect(V.w - lw - 10, V.h - 26, lw, 20);
+        ctx.strokeStyle = 'rgba(167,139,250,.5)'; ctx.lineWidth = 1;
+        ctx.strokeRect(V.w - lw - 10, V.h - 26, lw, 20);
+        ctx.fillStyle = C.purple;
+        ctx.fillText('紫虚线：AnalyticExpand 直达终点', V.w - lw - 2, V.h - 12);
+      }
+      ctx.restore();
+    }
+    drawEndpoints(V);
+  };
+
+  /* ============================================================
+     三、伪代码高亮联动
+     ============================================================ */
+  var HOT = {
+    astar: { pop: [2, 3], expand: [6, 7, 8], relax: [9, 10], goal: [5], fail: [] },
+    hybrid: {
+      init: [1], pop: [3], goal: [4], analytic: [4, 5], expand: [6], prune: [7],
+      check: [9], cost: [10], update: [11, 12, 13, 14, 15], heuristic: [16], fail: [], done: [17]
+    }
+  };
+  function makeHighlighter(preId, noteId, map, notes) {
+    var pre = document.getElementById(preId);
+    var note = document.getElementById(noteId);
+    if (!pre) return { set: function () { } };
+    var lines = {};
+    Array.prototype.forEach.call(pre.querySelectorAll('.ln'), function (el) {
+      lines[el.getAttribute('data-l')] = el;
+    });
+    var lastPhase = null;
+    return {
+      set: function (phase) {
+        if (phase === lastPhase) return;
+        lastPhase = phase;
+        Object.keys(lines).forEach(function (k) { lines[k].classList.remove('hot'); });
+        (map[phase] || []).forEach(function (l) {
+          if (lines[String(l)]) lines[String(l)].classList.add('hot');
+        });
+        if (note) note.textContent = (notes && notes[phase]) || '';
+      }
+    };
+  }
+
+  /* ============================================================
+     四、驱动
+     ============================================================ */
+  function init() {
+    var cvA = document.getElementById('cv-astar');
+    var cvH = document.getElementById('cv-hybrid');
+    if (!cvA || !cvH) return;
+
+    var astar = new AStar(), hybrid = new Hybrid();
+    var running = false, speed = 2;
+    // 两个搜索按“每秒扩展多少个节点”的速率推进，保证动画看得清、两者又差不多同时结束
+    var RATE_A = 40, RATE_H = 6;
+    var accA = 0, accH = 0, lastT = 0;
+    var onScreen = window.dshOnScreen ? window.dshOnScreen(cvA, 250) : null;
+    var btnPlay = document.getElementById('search-play');
+    var btnStep = document.getElementById('search-step');
+    var btnReset = document.getElementById('search-reset');
+    var spd = document.getElementById('search-speed');
+    var spdOut = document.getElementById('search-speed-out');
+    var cbTree = document.getElementById('search-tree');
+    var cbCost = document.getElementById('search-cost');
+    var statA = document.getElementById('astar-stats');
+    var statH = document.getElementById('hybrid-stats');
+
+    var A_NOTES = {
+      pop: '第 2–3 行：从优先队列里取出 f = g + h 最小的节点。',
+      expand: '第 6 行：枚举 8 个固定方向的邻居 m（没被扩展过的）。',
+      relax: '第 7–10 行：如果经由 n 到 m 更近，就更新 g(m)，这就是“松弛”。',
+      goal: '第 5 行：目标被弹出 → 搜索成功，回溯得到折线路径。',
+      fail: '优先队列空了，仍然没有到达目标。'
+    };
+    var H_NOTES = {
+      init: '第 1 行：Initialize()，把起点状态放进 open list P。',
+      pop: '第 3 行：弹出 f 最小的节点 n_c，并放进 closed set C。',
+      goal: '第 4 行：ReachGoal(n_c) —— 状态已经贴近终点、速度也够小。',
+      analytic: '第 4–5 行：AnalyticExpand 成功 —— 用两点边值最优轨迹直接连到终点，立刻结束搜索。',
+      expand: '第 6 行：Expand(n_c) —— 对离散控制输入逐个积分状态方程，得到 (2r+1)² 条原语。',
+      prune: '第 7 行：Prune —— 落在同一离散栅格的原语只留最便宜的一条。',
+      check: '第 9 行：CheckFeasible —— 碰撞 / 超速 / 出界，全部要通过。',
+      cost: '第 10 行：g_temp = n_c.g_c + EdgeCost(n_i)，其中 EdgeCost = (‖u_d‖²+ρ)τ。',
+      update: '第 11–15 行：不在队列里就加入；已在队列里且新代价更优就更新父节点与 g_c。',
+      heuristic: '第 16 行：f_c = g_c + Heuristic(n_i)，其中 Heuristic 由两点边值最优控制给出。',
+      fail: 'open list 空了，搜索失败（演示里把扩展上限设为 6000 个节点）。',
+      done: '第 17 行：RetrievePath() —— 回溯得到一条动力学可行的初始轨迹。'
+    };
+
+    var hlA = makeHighlighter('pseudo-astar', 'astar-note', HOT.astar, A_NOTES);
+    var hlH = makeHighlighter('pseudo-hybrid', 'hybrid-note', HOT.hybrid, H_NOTES);
+
+    function setPlayLabel() {
+      if (btnPlay) {
+        btnPlay.textContent = running ? '⏸ 暂停'
+          : ((astar.status === 'running' || hybrid.status === 'running') ? '▶ 播放' : '↻ 重新播放');
+      }
+    }
+    function reset() {
+      astar = new AStar(); hybrid = new Hybrid();
+      running = false; setPlayLabel();
+      hlA.set(''); hlH.set('');
+    }
+
+    if (btnPlay) btnPlay.addEventListener('click', function () {
+      if (astar.status !== 'running' && hybrid.status !== 'running') { reset(); running = true; }
+      else running = !running;
+      setPlayLabel();
+    });
+    if (btnStep) btnStep.addEventListener('click', function () {
+      running = false; setPlayLabel();
+      astar.step(1); hybrid.step(1);
+      hlA.set(astar.phase); hlH.set(hybrid.phase);
+      paint();
+    });
+    if (btnReset) btnReset.addEventListener('click', function () { reset(); paint(); });
+    // 复选框以前没有监听：搜索跑完之后再点“显示搜索树 / 代价标注”画面不会刷新（像是坏的）
+    if (cbTree) cbTree.addEventListener('change', function () { dirty = true; });
+    if (cbCost) cbCost.addEventListener('change', function () { dirty = true; });
+    if (spd) {
+      speed = parseInt(spd.value, 10) || 3;
+      spd.addEventListener('input', function () {
+        speed = parseInt(spd.value, 10) || 3;
+        if (spdOut) spdOut.textContent = speed + '×';
+      });
+      if (spdOut) spdOut.textContent = speed + '×';
+    }
+
+    function paint() {
+      var VA = view(cvA), VH = view(cvH);
+      astar.draw(VA);
+      hybrid.draw(VH, !cbTree || cbTree.checked, !cbCost || cbCost.checked);
+
+      function bar(items) {
+        return items.map(function (s) { return '<span class="si">' + s + '</span>'; }).join('<span class="sep">|</span>');
+      }
+
+      if (statA) {
+        var ia = ['扩展 <b>' + astar.expanded + '</b>',
+                  'open <b>' + astar.openCount() + '</b>',
+                  '栅格 ' + COLS + '×' + ROWS + '（' + CELL.toFixed(1) + ' m/格）'];
+        if (astar.status === 'done') ia.push('<span class="ok">✔ 找到折线路径</span>');
+        if (astar.status === 'fail') ia.push('<span class="bad">✘ 失败</span>');
+        statA.innerHTML = bar(ia);
+      }
+      if (statH) {
+        var cur = (hybrid.cur >= 0 && hybrid.nodes[hybrid.cur]) ? hybrid.nodes[hybrid.cur] : null;
+        var ih = ['扩展 <b>' + hybrid.expanded + '</b>',
+                  'open <b>' + hybrid.open.length + '</b>',
+                  '生成原语 <b>' + hybrid.generated + '</b>',
+                  '剪枝 <b>' + hybrid.pruned + '</b>',
+                  '不可行 <b>' + hybrid.rejected + '</b>'];
+        if (cur) ih.push('g<sub>c</sub> = <b>' + cur.g.toFixed(1) + '</b>');
+        if (cur) ih.push('f<sub>c</sub> = <b>' + cur.f.toFixed(1) + '</b>');
+        if (hybrid.status === 'done') ih.push('<span class="ok">✔ 找到可行轨迹</span>');
+        if (hybrid.status === 'fail') ih.push('<span class="bad">✘ 失败</span>');
+        statH.innerHTML = bar(ih);
+      }
+    }
+
+    /* dirty 标记：只有搜索状态或控件真的变了才重绘。
+       搜索结束后如果还每帧重画两张大画布，白烧 CPU，滚动也会发卡。 */
+    var dirty = true;
+
+    function loop(now) {
+      if (now === undefined) now = performance.now();
+      if (!lastT) lastT = now;
+      var dt = Math.min(0.1, (now - lastT) / 1000);
+      lastT = now;
+
+      // 画布不在视口附近：暂停推进，也不重绘（滚回来会从当前进度继续）
+      if (onScreen && !onScreen()) { requestAnimationFrame(loop); return; }
+
+      if (running) {
+        accA = Math.min(accA + dt * RATE_A * speed, 6);
+        accH = Math.min(accH + dt * RATE_H * speed, 6);
+        var guard = 0;
+        while (accA >= 1 && astar.status === 'running' && guard++ < 80) { astar.step(1); accA -= 1; }
+        guard = 0;
+        while (accH >= 1 && hybrid.status === 'running' && guard++ < 40) { hybrid.step(1); accH -= 1; }
+        hlA.set(astar.phase); hlH.set(hybrid.phase);
+        if (astar.status !== 'running' && hybrid.status !== 'running') { running = false; setPlayLabel(); }
+        dirty = true;
+      }
+      if (dirty) { paint(); dirty = false; }
+      requestAnimationFrame(loop);
+    }
+
+    reset();
+    paint();                            // 先画一帧静态地图，避免画布未进视口时是空白
+    requestAnimationFrame(loop);
+
+    // 尺寸变化（旋转屏幕 / 拖窗口）需要重绘一次，否则缓存尺寸变化后画面仍是旧的
+    window.addEventListener('resize', function () { dirty = true; });
+
+    // 滚动到这一节时自动开始播放一次（只自动播一次，之后交给按钮）
+    var started = false;
+    var sec = cvA.closest ? cvA.closest('#search') : null;
+    var reduceMotion = window.dshReducedMotion ? window.dshReducedMotion() : false;
+    if (sec && 'IntersectionObserver' in window && !reduceMotion) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting && !started) {
+            started = true;
+            io.disconnect();
+            reset();
+            running = true;
+            setPlayLabel();
+          }
+        });
+      }, { threshold: 0.3 });
+      io.observe(sec);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== primitives.js ===== */
+/* ============================================================
+   primitives.js —— 第 04 节：运动原语（Motion Primitive）生成演示
+   画布 #cv-primitives（高 340 CSS px）
+
+   这里要讲清楚的结论（对应 PPT P8 · P10 · P11）：
+     ① 每个轴的控制输入 u 被均匀离散成 2r+1 个值（含 0）：
+        { -u_max, ..., 0, ..., +u_max }
+     ② 三轴一组合就是 (2r+1)^3 个候选控制输入；
+        本演示画的是二维切片，所以是 (2r+1)^2 条原语。
+     ③ 每个候选控制输入恒定保持 tau 秒，对状态方程
+            x(t) = e^{At} x(0) + ∫ e^{A(t-s)} B u(s) ds
+        积分一次 → 得到一条“原语”。
+     ④ Fast-Planner 取 n = 2：状态 = 位置 + 速度（6 维），控制 = 加速度（3 维），
+        于是积分结果就是 p(t) = p0 + v0*t + 0.5*u*t^2 —— 恒定加速度轨迹。
+
+   本文件是传统 script（IIFE 包裹），无 import/export、无外部依赖，
+   页面用 file:// 直接打开即可运行。
+   ============================================================ */
+(function () {
+  'use strict';
+
+  /* ---------- 与站点一致的配色（硬编码，本文件自包含） ---------- */
+  var C = {
+    bg: '#0d1428',        // 画布底色（与站点 canvas 规则一致）
+    panel: '#0f1730',     // 画布内部的小卡片/标签底色（站点 --bg-2）
+    grid: '#24304f',      // 网格线
+    axis: '#43537d',      // 坐标轴
+    ink: '#e8ecf8',       // 主文字
+    muted: '#9aa7c7',     // 次要文字
+    blue: '#4ea1ff',      // 强调蓝
+    teal: '#39e0b0',      // 青绿：起点
+    orange: '#ffb454',    // 橙
+    red: '#ff5c7a',       // 红：|u| 最大
+    purple: '#a78bfa'
+  };
+  var FONT = 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif';
+  var MONO = '"Cascadia Mono", "Consolas", ui-monospace, monospace';
+
+  /* ---------- 教学参数 ---------- */
+  var H_CSS = 340;          // 画布高度（CSS px），与 HTML 契约一致
+  var TAU = 0.9;            // 每条原语的持续时间 tau（s）—— 与第 03 节 Hybrid A* 搜索演示一致
+  var SWEEP = 2.5;          // 波前从 t=0 扫到 t=tau 的用时（s），约 2.5 秒一轮
+  var HOLD = 0.6;           // 扫到 tau 之后的停顿（s），然后循环重放
+  var SAMPLES = 24;         // 每条原语的采样段数
+  var PAD = { l: 54, r: 22, t: 56, b: 60 };   // 画布内边距（上留给摘要，下留给刻度与注释）
+
+  /* ---------- 颜色工具：把 |u| 映射到 蓝 → 青 → 橙 → 红 ---------- */
+  function hex2rgb(h) {
+    return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)];
+  }
+  var RAMP = [
+    { k: 0.00, c: hex2rgb(C.blue) },
+    { k: 0.34, c: hex2rgb(C.teal) },
+    { k: 0.67, c: hex2rgb(C.orange) },
+    { k: 1.00, c: hex2rgb(C.red) }
+  ];
+  function rampColor(k) {
+    if (!(k >= 0)) k = 0;
+    if (k > 1) k = 1;
+    for (var i = 1; i < RAMP.length; i++) {
+      if (k <= RAMP[i].k) {
+        var a = RAMP[i - 1], b = RAMP[i];
+        var f = (b.k - a.k) > 0 ? (k - a.k) / (b.k - a.k) : 0;
+        return [
+          Math.round(a.c[0] + (b.c[0] - a.c[0]) * f),
+          Math.round(a.c[1] + (b.c[1] - a.c[1]) * f),
+          Math.round(a.c[2] + (b.c[2] - a.c[2]) * f)
+        ];
+      }
+    }
+    return RAMP[RAMP.length - 1].c.slice();
+  }
+  function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+
+  /* ---------- 数字工具 ---------- */
+  // 刻度间距只从 0.2 / 0.5 / 1 米里自适应地挑一个（挑得出得下最多刻度的最小间距）
+  var TICK_STEPS = [0.2, 0.5, 1];
+  function tickStep(range, maxTicks) {
+    for (var i = 0; i < TICK_STEPS.length; i++) {
+      if (range / TICK_STEPS[i] <= maxTicks) return TICK_STEPS[i];
+    }
+    return TICK_STEPS[TICK_STEPS.length - 1];
+  }
+  function trimNum(v, step) {
+    if (Math.abs(v) < step * 1e-6) v = 0;
+    var d = step >= 1 ? 0 : (step >= 0.1 ? 1 : 2);
+    var s = v.toFixed(d);
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s === '-0' ? '0' : s;
+  }
+  function fmt3(v) { return (Math.round(v * 1000) / 1000).toFixed(3); }
+
+  /* ---------- 绘制小工具 ---------- */
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+  // 画一段文字，可选半透明底色（避免压在 25 条曲线上看不清）
+  function tag(ctx, text, x, y, font, color, align, halo) {
+    ctx.font = font;
+    var w = ctx.measureText(text).width;
+    var left = align === 'center' ? x - w / 2 : (align === 'right' ? x - w : x);
+    if (halo) {
+      ctx.fillStyle = 'rgba(15,23,48,.86)';
+      roundRect(ctx, left - 5, y - 12, w + 10, 17, 4);
+      ctx.fill();
+    }
+    ctx.textAlign = 'left';
+    ctx.fillStyle = color;
+    ctx.fillText(text, left, y);
+    return w;
+  }
+
+  /* ============================================================ */
+  function init() {
+    var canvas = document.getElementById('cv-primitives');
+    if (!canvas) return;                                   // 页面没有这个画布就安静退出
+    var ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return;
+
+    // 控件与读数（一律做存在性判断，避免裸引用不存在的元素）
+    var elUmax = document.getElementById('prim-umax');
+    var elR = document.getElementById('prim-r');
+    var elV0 = document.getElementById('prim-v0');          // 起点初速度（+x 方向），页面默认 2.5 m/s
+    var outUmax = document.getElementById('prim-umax-out');
+    var outR = document.getElementById('prim-r-out');
+    var outV0 = document.getElementById('prim-v0-out');
+    var outAxis = document.getElementById('prim-axis');
+    var outCount = document.getElementById('prim-count');
+    var outCount3d = document.getElementById('prim-count-3d');
+    var btnReplay = document.getElementById('prim-replay');
+
+    /* ---------- 状态 ---------- */
+    var st = {
+      umax: 2, r: 2, v0: 0,
+      cssW: 900, dpr: 1,
+      plotW: 800, plotH: 232,
+      prims: [],
+      ex: { xmin: -1, xmax: 1, ymin: -1, ymax: 1 },
+      view: { s: 60, ox: 120, oy: 170 },
+      vis: { x0: 0, x1: 8, y0: -1, y1: 1 },
+      t: 0
+    };
+    var animStart = 0;
+    var resizePending = false;
+
+    /* ---------- 尺寸：自适应容器宽度 + devicePixelRatio ---------- */
+    function measureWidth(cv) {
+      var host = cv.parentNode;
+      var hostW = 0;
+      if (host && host.clientWidth) {
+        hostW = host.clientWidth;
+        var cs = window.getComputedStyle ? window.getComputedStyle(host) : null;
+        if (cs) {
+          hostW -= (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+        }
+      }
+      var own = cv.clientWidth || 0;
+      var w = (own > 0 && hostW > 0) ? Math.min(own, hostW) : (own || hostW);
+      if (!w || !isFinite(w) || w < 240) w = 820;         // 兜底宽度
+      return Math.max(260, Math.min(Math.round(w), 2400));
+    }
+    function fitCanvas() {
+      st.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+      st.cssW = measureWidth(canvas);
+      canvas.width = Math.round(st.cssW * st.dpr);
+      canvas.height = Math.round(H_CSS * st.dpr);
+      canvas.style.height = H_CSS + 'px';                 // 高度固定 340 CSS px
+      canvas.style.display = 'block';
+      ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);       // 之后全部用 CSS 像素坐标绘制
+    }
+
+    /* ---------- 从控件读取参数 ---------- */
+    // init() 里的第一次 rebuild() 就会调用它，所以 #prim-v0 的初始 value（页面默认 2.5 m/s）
+    // 在首帧绘制之前就被读进来了，不需要等用户拖动。
+    function readControls() {
+      var u = elUmax ? parseFloat(elUmax.value) : NaN;
+      st.umax = (isFinite(u) && u > 0) ? u : 2;
+      var r = elR ? parseFloat(elR.value) : NaN;
+      st.r = (isFinite(r) && r >= 1) ? Math.round(r) : 2;
+      var v = elV0 ? parseFloat(elV0.value) : NaN;
+      st.v0 = isFinite(v) ? v : 0;                        // 页面没给 #prim-v0 时退化为 v0 = 0（直线扇面）
+    }
+
+    /* ---------- 原语 = 恒定加速度积分 tau 秒（n = 2 时状态方程的解） ---------- */
+    function posAt(p, t) {
+      return {
+        x: st.v0 * t + 0.5 * p.ux * t * t,
+        y: 0.5 * p.uy * t * t
+      };
+    }
+    function buildPrims() {
+      var cols = 2 * st.r + 1;              // 每轴 2r+1 档（含 0）
+      var du = st.umax / st.r;              // 档位间隔：0, ±u_max/r, ..., ±u_max
+      var list = [];
+      var i, j, k, n;
+      for (i = 0; i < cols; i++) {
+        for (j = 0; j < cols; j++) {
+          var ux = -st.umax + i * du;
+          var uy = -st.umax + j * du;
+          var pts = [];
+          for (n = 0; n <= SAMPLES; n++) {
+            pts.push(posAt({ ux: ux, uy: uy }, TAU * n / SAMPLES));
+          }
+          list.push({
+            ux: ux, uy: uy,
+            mag: Math.sqrt(ux * ux + uy * uy),
+            pts: pts
+          });
+        }
+      }
+      // 颜色按 |u| 归一化：最大值出现在控制方盒的四个角 |u| = sqrt(2)*u_max
+      var mmax = Math.SQRT2 * st.umax;
+      for (k = 0; k < list.length; k++) {
+        list[k].col = rampColor(mmax > 0 ? list[k].mag / mmax : 0);
+      }
+      st.prims = list;
+    }
+
+    /* ---------- 世界范围（由所有原语端点决定）与视图变换 ---------- */
+    function computeExtents() {
+      var ex = st.ex, k, n, p;
+      ex.xmin = 0; ex.xmax = 0; ex.ymin = 0; ex.ymax = 0;   // (0,0) 一定在范围内
+      for (k = 0; k < st.prims.length; k++) {
+        var pts = st.prims[k].pts;
+        for (n = 0; n < pts.length; n++) {
+          p = pts[n];
+          if (p.x < ex.xmin) ex.xmin = p.x;
+          if (p.x > ex.xmax) ex.xmax = p.x;
+          if (p.y < ex.ymin) ex.ymin = p.y;
+          if (p.y > ex.ymax) ex.ymax = p.y;
+        }
+      }
+    }
+    function computeView() {
+      var ex = st.ex;
+      st.plotW = Math.max(120, st.cssW - PAD.l - PAD.r);
+      st.plotH = Math.max(80, H_CSS - PAD.t - PAD.b);
+
+      // —— 可视范围自适应 ——
+      // 数据包围盒直接取自所有原语采样点，所以 v0·tau 这一项天然被算进去了：
+      // v0 越大、u_max 越大、tau 越长，端点越远，视野自动跟着放大。
+      var dataW = Math.max(ex.xmax - ex.xmin, 0.25);
+      var dataH = Math.max(ex.ymax - ex.ymin, 0.25);
+      var padX = dataW * 0.05;                       // 左右各留一点呼吸空间
+      var padY = dataH * 0.06;
+      var xLeftEdge = ex.xmin - padX;
+
+      // 目标：从左侧边界到最远端点约占可视宽度的 70%（剩余 30% 右侧留白）
+      var sWant = st.plotW / ((ex.xmax - xLeftEdge) / 0.70);
+      // 但纵向上绝不能裁掉原语（这是硬约束）
+      var sFitY = st.plotH / (dataH + padY * 2);
+      // x / y 同一个比例尺：同一米数在屏幕上等长，抛物线的形状才不失真
+      var s = Math.min(sWant, sFitY);
+      if (!isFinite(s) || s <= 0) s = 100;
+
+      var ox = PAD.l + (0 - xLeftEdge) * s;          // 起点贴绘图区左侧
+      var oy = PAD.t + (st.plotH + (ex.ymin + ex.ymax) * s) / 2;   // 数据纵向居中
+      st.view = { s: s, ox: ox, oy: oy };
+      st.vis = {
+        x0: (PAD.l - ox) / s,
+        x1: (st.cssW - PAD.r - ox) / s,
+        y0: (oy - (H_CSS - PAD.b)) / s,
+        y1: (oy - PAD.t) / s
+      };
+    }
+    function X(wx) { return st.view.ox + wx * st.view.s; }
+    function Y(wy) { return st.view.oy - wy * st.view.s; }
+
+    /* ---------- 读数同步 ---------- */
+    function syncReadouts() {
+      var axis = 2 * st.r + 1;
+      // 输出格式与页面里 output 的初始文字保持一致（u_max / v0 带单位）
+      if (outUmax) outUmax.textContent = st.umax.toFixed(1) + ' m/s²';
+      if (outV0) outV0.textContent = st.v0.toFixed(1) + ' m/s';
+      if (outR) outR.textContent = String(st.r);
+      if (outAxis) outAxis.textContent = String(axis);
+      if (outCount) outCount.textContent = String(axis * axis);
+      if (outCount3d) outCount3d.textContent = String(axis * axis * axis);
+    }
+
+    /* ---------- 网格 / 坐标轴 / 刻度 ---------- */
+    function drawGrid() {
+      var vis = st.vis;
+      var stepX = tickStep(vis.x1 - vis.x0, 10);  // 间距自适应：0.2 / 0.5 / 1 米
+      var stepY = tickStep(vis.y1 - vis.y0, 6);
+      var i, v, px, py;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l, PAD.t, st.plotW, st.plotH);
+      ctx.clip();
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = C.grid;
+      // 竖网格
+      for (v = Math.ceil(vis.x0 / stepX) * stepX; v <= vis.x1; v += stepX) {
+        px = Math.round(X(v)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(px, PAD.t); ctx.lineTo(px, PAD.t + st.plotH); ctx.stroke();
+      }
+      // 横网格
+      for (v = Math.ceil(vis.y0 / stepY) * stepY; v <= vis.y1; v += stepY) {
+        py = Math.round(Y(v)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(PAD.l, py); ctx.lineTo(PAD.l + st.plotW, py); ctx.stroke();
+      }
+
+      // 坐标轴（x 轴 = y 的世界 0 线，y 轴 = x 的世界 0 线）
+      ctx.strokeStyle = C.axis;
+      ctx.lineWidth = 1.2;
+      py = Math.round(Y(0)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(PAD.l, py); ctx.lineTo(PAD.l + st.plotW, py); ctx.stroke();
+      px = Math.round(X(0)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(px, PAD.t); ctx.lineTo(px, PAD.t + st.plotH); ctx.stroke();
+      ctx.restore();
+
+      // 刻度数字（画在绘图区外，所以不裁剪）
+      ctx.font = '11px ' + MONO;
+      ctx.fillStyle = C.muted;
+      ctx.textAlign = 'center';
+      for (v = Math.ceil(vis.x0 / stepX) * stepX; v <= vis.x1; v += stepX) {
+        ctx.fillText(trimNum(v, stepX), X(v), PAD.t + st.plotH + 15);
+      }
+      ctx.textAlign = 'right';
+      for (v = Math.ceil(vis.y0 / stepY) * stepY; v <= vis.y1; v += stepY) {
+        ctx.fillText(trimNum(v, stepY), PAD.l - 8, Y(v) + 4);
+      }
+      ctx.textAlign = 'left';
+
+      // 轴名 + 单位
+      tag(ctx, 'x (m) 距离', PAD.l + st.plotW - 4, Y(0) - 8, '11px ' + MONO, C.muted, 'right', false);
+      tag(ctx, 'y (m)', X(0) + 8, PAD.t + 12, '11px ' + MONO, C.muted, 'left', false);
+    }
+
+    /* ---------- v0 方向（水平虚线 + 箭头，文字注释在左下角） ---------- */
+    function drawVelocityAxis() {
+      var dir = st.v0 < 0 ? -1 : 1;                  // 初速度是水平的，默认 v0 = 0
+      var len = Math.min(st.plotW * 0.30, Math.max(48, st.ex.xmax * st.view.s * 0.75));
+      var x1 = X(0) + dir * len;
+
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = 'rgba(232,236,248,.55)';   // 比坐标轴亮，才看得出这是一条独立的指示线
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(0));
+      ctx.lineTo(x1, Y(0));
+      ctx.stroke();
+      // 小箭头，强调这是“速度方向”
+      ctx.beginPath();
+      ctx.moveTo(x1, Y(0));
+      ctx.lineTo(x1 - dir * 5, Y(0) - 3.2);
+      ctx.moveTo(x1, Y(0));
+      ctx.lineTo(x1 - dir * 5, Y(0) + 3.2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    /* ---------- 原语本体：已走过的部分亮、未走过的部分极淡 ---------- */
+    function drawPrims() {
+      var frac = st.t / TAU;
+      if (!(frac >= 0)) frac = 0;
+      if (frac > 1) frac = 1;
+      var k = Math.floor(frac * SAMPLES);
+      var hot = st.prims.length > 40 ? 0.68 : (st.prims.length > 25 ? 0.80 : 0.92);
+      var i, n, p, pts, h;
+
+      // ① 还没走到的一段：极淡
+      if (k < SAMPLES) {
+        ctx.lineWidth = 1.3;
+        for (i = 0; i < st.prims.length; i++) {
+          p = st.prims[i]; pts = p.pts; h = posAt(p, st.t);
+          ctx.strokeStyle = rgba(p.col, 0.13);
+          ctx.beginPath();
+          ctx.moveTo(X(h.x), Y(h.y));
+          if (k + 1 <= SAMPLES) ctx.lineTo(X(pts[k + 1].x), Y(pts[k + 1].y));
+          for (n = k + 2; n <= SAMPLES; n++) ctx.lineTo(X(pts[n].x), Y(pts[n].y));
+          ctx.stroke();
+        }
+      }
+
+      // ② 已经走过的一段：实线、透明度高（周期衔接处淡出，避免“实线瞬间缩回原点”）
+      var A = st.alpha === undefined ? 1 : st.alpha;
+      if (A > 0.03) {
+        ctx.lineWidth = 1.7;
+        for (i = 0; i < st.prims.length; i++) {
+          p = st.prims[i]; pts = p.pts; h = posAt(p, st.t);
+          ctx.strokeStyle = rgba(p.col, hot * A);
+          ctx.beginPath();
+          ctx.moveTo(X(pts[0].x), Y(pts[0].y));
+          for (n = 1; n <= k && n <= SAMPLES; n++) ctx.lineTo(X(pts[n].x), Y(pts[n].y));
+          ctx.lineTo(X(h.x), Y(h.y));
+          ctx.stroke();
+        }
+      }
+
+      // ③ 波前上的端点小圆点
+      if (A > 0.03) {
+        for (i = 0; i < st.prims.length; i++) {
+          p = st.prims[i]; h = posAt(p, st.t);
+          ctx.fillStyle = rgba(p.col, 0.95 * A);
+          ctx.beginPath(); ctx.arc(X(h.x), Y(h.y), 2.3, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    /* ---------- 起点：扇面中心只留一个小十字标记 ---------- */
+    function drawOrigin() {
+      var x = X(0), y = Y(0), a = 4.5;
+      ctx.lineCap = 'round';
+      // 先描一圈底色，保证压在彩色原语上也看得见
+      ctx.strokeStyle = 'rgba(13,20,40,.9)';
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(x - a, y); ctx.lineTo(x + a, y);
+      ctx.moveTo(x, y - a); ctx.lineTo(x, y + a);
+      ctx.stroke();
+      ctx.strokeStyle = C.teal;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x - a, y); ctx.lineTo(x + a, y);
+      ctx.moveTo(x, y - a); ctx.lineTo(x, y + a);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+
+    /* ---------- 图例小卡片：固定贴右上角，按剩余空间选完整 / 紧凑两种写法 ---------- */
+    function drawLegend() {
+      var axis = 2 * st.r + 1;
+      // 扇面右缘（最远端点）到画布右边界之间还剩多少地方
+      var avail = (st.cssW - 12) - (X(st.ex.xmax) + 10);
+      if (avail < 134) return;                      // 放不下就不画（信息在左上角摘要与 HTML 读数里都有）
+      var full = avail >= 228;
+      var lw = full ? 224 : Math.min(140, avail);
+      var lh = full ? 162 : 150;
+      var lx = st.cssW - lw - 12;
+      var ly = PAD.t - 8;
+
+      ctx.fillStyle = C.panel;
+      ctx.strokeStyle = C.grid;
+      ctx.lineWidth = 1;
+      roundRect(ctx, lx, ly, lw, lh, 10);
+      ctx.fill(); ctx.stroke();
+
+      var x0 = lx + 12, y0 = ly + 24;
+      var steps = 26, i, bw;
+
+      if (full) {
+        ctx.font = '12px ' + FONT;
+        ctx.fillStyle = C.ink;
+        ctx.fillText('一条原语 = 恒定加速度积分 1 步', x0, y0);
+
+        // |u| 色标：蓝（小）→ 红（大）
+        ctx.font = '10px ' + MONO;
+        ctx.fillStyle = C.muted;
+        ctx.fillText('|u| 小', x0, y0 + 22);
+        ctx.fillText('大', x0 + 152, y0 + 22);
+        bw = 118 / steps;
+        for (i = 0; i < steps; i++) {
+          ctx.fillStyle = rgba(rampColor(i / (steps - 1)), 1);
+          ctx.fillRect(x0 + 30 + i * bw, y0 + 13, bw + 1, 10);
+        }
+
+        ctx.font = '11px ' + MONO;
+        ctx.fillStyle = C.muted;
+        ctx.fillText('每轴 2r+1 = ' + axis + ' 档(含 0)', x0, y0 + 46);
+        ctx.fillText('二维 (2r+1)^2 = ' + (axis * axis) + ' 条原语', x0, y0 + 64);
+        ctx.fillText('三维 (2r+1)^3 = ' + (axis * axis * axis) + ' 条输入', x0, y0 + 82);
+        ctx.fillText('tau = ' + TAU.toFixed(1) + ' s 内控制恒定', x0, y0 + 100);
+        ctx.font = '10px ' + MONO;
+        ctx.fillStyle = C.blue;
+        ctx.fillText('u = [ax,ay,az] ∈ [-umax,umax]^3', x0, y0 + 122);
+      } else {
+        // 紧凑写法：原语变长后扇面更宽，右上角只剩一条窄带，只能放最短的几行
+        ctx.font = '11px ' + FONT;
+        ctx.fillStyle = C.ink;
+        ctx.fillText('一条原语', x0, y0);
+
+        ctx.font = '10px ' + MONO;
+        ctx.fillStyle = C.muted;
+        ctx.fillText('小', x0, y0 + 43);
+        ctx.fillText('大', x0 + 82, y0 + 43);
+        bw = 64 / steps;
+        for (i = 0; i < steps; i++) {
+          ctx.fillStyle = rgba(rampColor(i / (steps - 1)), 1);
+          ctx.fillRect(x0 + 14 + i * bw, y0 + 34, bw + 1, 10);
+        }
+
+        ctx.fillStyle = C.muted;
+        ctx.fillText('每轴 ' + axis + ' 档', x0, y0 + 66);
+        ctx.fillText('2D ' + (axis * axis) + ' 条', x0, y0 + 84);
+        ctx.fillText('3D ' + (axis * axis * axis) + ' 条', x0, y0 + 102);
+        ctx.fillText('tau = ' + TAU.toFixed(1) + ' s', x0, y0 + 120);
+        ctx.fillStyle = C.blue;
+        ctx.fillText('恒定加速度', x0, y0 + 138);
+      }
+    }
+
+    /* ---------- 文字信息 ---------- */
+    function drawTexts() {
+      var axis = 2 * st.r + 1;
+      ctx.textAlign = 'left';
+
+      // 左上角一：当前参数摘要（窄画布用紧凑写法，避免被右边界裁掉）
+      var narrowHead = st.cssW < 440;
+      ctx.font = narrowHead ? '12px ' + FONT : '13px ' + FONT;
+      ctx.fillStyle = C.ink;
+      ctx.fillText(narrowHead
+        ? 'u_max=' + st.umax.toFixed(1) + ', r=' + st.r + ' -> ' + axis + ' 档/轴, ' + (axis * axis) + ' 条'
+        : 'u_max = ' + st.umax.toFixed(1) + ' m/s^2,  r = ' + st.r +
+          '  ->  每轴 ' + axis + ' 档,  二维 ' + (axis * axis) + ' 条原语', 16, 26);
+
+      // 左上角二：tau（原语时长）与当前动画时刻 —— tau 与第 03 节搜索演示取值一致
+      ctx.font = '11px ' + MONO;
+      ctx.fillStyle = C.muted;
+      ctx.fillText(st.cssW >= 400
+        ? '每条原语：控制恒定 tau = ' + TAU.toFixed(1) + ' s   |   t = ' + fmt3(st.t) + ' s / ' + TAU.toFixed(1) + ' s'
+        : 'tau = ' + TAU.toFixed(1) + ' s  |  t = ' + fmt3(st.t) + ' / ' + TAU.toFixed(1) + ' s', 16, 44);
+
+      // 左下角一：起点状态 + “速度方向”注释（都放在扇面之外，不压住原语）
+      // 按画布宽度分三档写法，保证任何宽度下都不会被右边界裁掉
+      ctx.font = '11px ' + MONO;
+      var wide = st.cssW >= 500;
+      var mid = st.cssW >= 352;
+      var head = (wide ? '起点 x(0): p0 = (0, 0), v0 = (' : 'x(0): p0=(0,0), v0=(') +
+        st.v0.toFixed(1) + (wide ? ', 0) m/s' : ',0)');
+      var tail = wide
+        ? '   水平虚线 = 速度方向（沿 ' + (st.v0 < 0 ? '-x）' : '+x）')
+        : (mid ? '  虚线=速度方向(' + (st.v0 < 0 ? '-x)' : '+x)') : '');
+      ctx.fillStyle = C.teal;
+      ctx.fillText(head, 16, H_CSS - 30);
+      if (tail) {
+        ctx.fillStyle = C.muted;
+        ctx.fillText(tail, 16 + ctx.measureText(head).width, H_CSS - 30);
+      }
+
+      // 左下角二：原语是怎么来的（n = 2 时状态方程的解就是恒定加速度轨迹）
+      ctx.fillStyle = C.muted;
+      ctx.fillText(st.cssW >= 500
+        ? 'p(t) = p0 + v0*t + 0.5*u*t^2   (n = 2 时原语即恒定加速度轨迹)'
+        : 'p(t) = p0 + v0*t + 0.5*u*t^2', 16, H_CSS - 12);
+
+      drawLegend();
+    }
+
+    /* ---------- 主绘制 ---------- */
+    function draw() {
+      var W = st.cssW, H = H_CSS;
+      ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      drawGrid();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(PAD.l, PAD.t, st.plotW, st.plotH);
+      ctx.clip();
+      drawVelocityAxis();
+      drawPrims();
+      drawOrigin();
+      ctx.restore();
+
+      drawTexts();
+    }
+
+    /* ---------- 动画：一条从 t=0 扫到 t=tau 的“波前” ---------- */
+    var onScreen = window.dshOnScreen ? window.dshOnScreen(canvas, 200) : function () { return true; };
+    var reduced = window.dshReducedMotion ? window.dshReducedMotion() : false;
+
+    function tick(now) {
+      if (!animStart) animStart = now;
+      var el = (now - animStart) / 1000;
+      var cyc = SWEEP + HOLD;
+      var ph = el % cyc;
+      if (ph > SWEEP) ph = SWEEP;              // 到达 tau 后停留一小会儿
+      st.t = TAU * (ph / SWEEP);
+      // 周期首尾淡入淡出：否则每次循环开始时，实线会在某一帧里“缩回原点”
+      var FADE = 0.28;                         // 淡入/淡出时长（s）
+      if (ph < FADE) st.alpha = ph / FADE;
+      else if (ph > SWEEP - FADE) st.alpha = Math.max(0, (SWEEP - ph) / FADE);
+      else st.alpha = 1;
+      // 画布不在视口附近就不重绘：这块每帧要画 (2r+1)^2 条原语，是页面上最重的循环
+      if (onScreen()) draw();
+      requestAnimationFrame(tick);
+    }
+    function replay() {
+      animStart = 0;                           // 下一次 tick 重新开始计时
+      st.t = 0;
+      st.alpha = 0;                            // 从全透明开始，淡入到扫完
+      draw();
+    }
+
+    /* ---------- 参数变化后重建 ---------- */
+    function rebuild() {
+      readControls();
+      buildPrims();
+      computeExtents();
+      computeView();
+      syncReadouts();
+      replay();
+    }
+
+    function onResize() {
+      if (resizePending) return;
+      resizePending = true;
+      requestAnimationFrame(function () {
+        resizePending = false;
+        fitCanvas();
+        computeView();
+        draw();
+      });
+    }
+
+    /* ---------- 事件绑定 ---------- */
+    if (elUmax) elUmax.addEventListener('input', rebuild);
+    if (elR) elR.addEventListener('input', rebuild);
+    if (elV0) elV0.addEventListener('input', rebuild);
+    if (btnReplay) btnReplay.addEventListener('click', replay);
+    window.addEventListener('resize', onResize);
+
+    /* ---------- 启动 ---------- */
+    fitCanvas();
+    rebuild();
+    if (reduced) { st.t = TAU; draw(); }   // 系统设置“减少动效”：只画一条已经展开完的静止画面
+    else requestAnimationFrame(tick);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== cost.js ===== */
+/* ============================================================
+   cost.js —— 第 05 节：原语代价（Edge Cost）拆解演示
+   画布 #cv-cost（高 300 CSS px）
+
+   这里要讲清楚的结论（对应 PPT P12）：
+     ① 单个原语的代价      e_c = ( ‖u_d‖² + ρ ) · τ
+        ‖u_d‖² 是离散控制输入的平方范数（加速度越大越贵，而且是平方级地贵）；
+        ρ 是附加惩罚项（对“磨时间”额外收费）；τ 是原语持续时间。
+     ② 一条 J 段轨迹的真实代价
+        g_c = Σ_{j=1..J} ( ‖(u_d)_j‖² + ρ ) · τ
+     ③ 放进 Hybrid A* 的搜索里：
+        g_temp = n_c.g_c + EdgeCost(n_i)      （父节点累计代价 + 这一步的代价）
+        f_c    = g_c + Heuristic              （再加启发式，决定先扩展谁）
+
+   本文件是传统 script（IIFE 包裹），无 import/export、无外部依赖，
+   页面用 file:// 直接打开即可运行。
+   ============================================================ */
+(function () {
+  'use strict';
+
+  /* ---------- 与站点一致的配色（硬编码，本文件自包含） ---------- */
+  var C = {
+    bg: '#0d1428',        // 画布底色（与站点 canvas 规则一致）
+    panel: '#0f1730',     // 画布内部小卡片底色（站点 --bg-2）
+    grid: '#24304f',      // 网格线 / 分隔线
+    axis: '#43537d',      // 坐标轴
+    ink: '#e8ecf8',       // 主文字（也是高亮描边色）
+    muted: '#9aa7c7',     // 次要文字
+    blue: '#4ea1ff',
+    teal: '#39e0b0',
+    orange: '#ffb454',
+    red: '#ff5c7a',
+    purple: '#a78bfa'
+  };
+  var FONT = 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif';
+  var MONO = '"Cascadia Mono", "Consolas", ui-monospace, monospace';
+
+  var H_CSS = 300;                    // 画布高度（CSS px），与 HTML 契约一致
+  var J = 5;                          // 右块演示的轨迹段数
+  var U_SLIDER_MAX = 3;               // 滑块 #cost-u 的上限，用作柱状图/堆叠条的量程
+  var SEG_COLORS = [C.blue, C.teal, C.orange, C.red, C.purple];   // 5 段各用一种颜色
+
+  /* ---------- 颜色工具：蓝 → 青 → 橙 → 红 ---------- */
+  function hex2rgb(h) {
+    return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)];
+  }
+  var RAMP = [
+    { k: 0.00, c: hex2rgb(C.blue) },
+    { k: 0.34, c: hex2rgb(C.teal) },
+    { k: 0.67, c: hex2rgb(C.orange) },
+    { k: 1.00, c: hex2rgb(C.red) }
+  ];
+  function rampColor(k) {
+    if (!(k >= 0)) k = 0;
+    if (k > 1) k = 1;
+    for (var i = 1; i < RAMP.length; i++) {
+      if (k <= RAMP[i].k) {
+        var a = RAMP[i - 1], b = RAMP[i];
+        var f = (b.k - a.k) > 0 ? (k - a.k) / (b.k - a.k) : 0;
+        return [
+          Math.round(a.c[0] + (b.c[0] - a.c[0]) * f),
+          Math.round(a.c[1] + (b.c[1] - a.c[1]) * f),
+          Math.round(a.c[2] + (b.c[2] - a.c[2]) * f)
+        ];
+      }
+    }
+    return RAMP[RAMP.length - 1].c.slice();
+  }
+  function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+
+  /* ---------- 数字工具 ---------- */
+  function niceStep(range, target) {
+    var raw = range / Math.max(1, target);
+    if (!(raw > 0) || !isFinite(raw)) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var n = raw / mag;
+    var m = n <= 1 ? 1 : (n <= 2 ? 2 : (n <= 5 ? 5 : 10));
+    return m * mag;
+  }
+  function trimNum(v, step) {
+    if (Math.abs(v) < step * 1e-6) v = 0;
+    var d = step >= 1 ? 0 : (step >= 0.1 ? 1 : 2);
+    var s = v.toFixed(d);
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s === '-0' ? '0' : s;
+  }
+  function fmt3(v) { return v.toFixed(3); }
+
+  /* ---------- 绘制小工具 ---------- */
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  /* ============================================================ */
+  function init() {
+    var canvas = document.getElementById('cv-cost');
+    if (!canvas) return;                                   // 页面没有这个画布就安静退出
+    var ctx = canvas.getContext ? canvas.getContext('2d') : null;
+    if (!ctx) return;
+
+    var elU = document.getElementById('cost-u');
+    var elTau = document.getElementById('cost-tau');
+    var elRho = document.getElementById('cost-rho');
+    var outU = document.getElementById('cost-u-out');
+    var outTau = document.getElementById('cost-tau-out');
+    var outRho = document.getElementById('cost-rho-out');
+    var outEc = document.getElementById('cost-ec');
+    var outEcBare = document.getElementById('cost-ec-bare');
+    var outGc = document.getElementById('cost-gc');
+
+    var st = {
+      u: 1.5, tau: 1.0, rho: 0.5,
+      cssW: 900, dpr: 1
+    };
+    var resizePending = false;
+
+    /* ---------- 尺寸：自适应容器宽度 + devicePixelRatio ---------- */
+    function measureWidth(cv) {
+      var host = cv.parentNode;
+      var hostW = 0;
+      if (host && host.clientWidth) {
+        hostW = host.clientWidth;
+        var cs = window.getComputedStyle ? window.getComputedStyle(host) : null;
+        if (cs) {
+          hostW -= (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+        }
+      }
+      var own = cv.clientWidth || 0;
+      var w = (own > 0 && hostW > 0) ? Math.min(own, hostW) : (own || hostW);
+      if (!w || !isFinite(w) || w < 240) w = 820;          // 兜底宽度
+      return Math.max(260, Math.min(Math.round(w), 2400));
+    }
+    function fitCanvas() {
+      st.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2.5));
+      st.cssW = measureWidth(canvas);
+      canvas.width = Math.round(st.cssW * st.dpr);
+      canvas.height = Math.round(H_CSS * st.dpr);
+      canvas.style.height = H_CSS + 'px';                  // 高度固定 300 CSS px
+      canvas.style.display = 'block';
+      ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);        // 之后全部用 CSS 像素坐标绘制
+    }
+
+    /* ---------- 从控件读取参数 ---------- */
+    function readControls() {
+      var u = elU ? parseFloat(elU.value) : NaN;
+      st.u = (isFinite(u) && u >= 0) ? u : 1.5;
+      var t = elTau ? parseFloat(elTau.value) : NaN;
+      st.tau = (isFinite(t) && t > 0) ? t : 1.0;
+      var r = elRho ? parseFloat(elRho.value) : NaN;
+      st.rho = (isFinite(r) && r >= 0) ? r : 0.5;
+    }
+
+    /* ---------- 代价公式：e_c = (|u|² + ρ)·τ ---------- */
+    function edgeCost(mag) { return (mag * mag + st.rho) * st.tau; }
+
+    /* ---------- 读数同步 ---------- */
+    function syncReadouts() {
+      var ec = edgeCost(st.u);
+      if (outU) outU.textContent = st.u.toFixed(1);
+      if (outTau) outTau.textContent = st.tau.toFixed(1);
+      if (outRho) outRho.textContent = st.rho.toFixed(1);
+      if (outEc) outEc.textContent = fmt3(ec);
+      if (outEcBare) outEcBare.textContent = fmt3(st.u * st.u * st.tau);
+      if (outGc) outGc.textContent = fmt3(J * ec);
+    }
+
+    /* ---------- 顶部公式 ---------- */
+    function drawHeader() {
+      var wide = st.cssW >= 620;
+      ctx.textAlign = 'left';
+      ctx.font = '13px ' + MONO;
+      ctx.fillStyle = C.ink;
+      ctx.fillText('e_c = (|u|^2 + rho) * tau' + (wide ? '     单条原语（一步）的代价' : ''), 16, 26);
+
+      ctx.font = '11px ' + FONT;
+      ctx.fillStyle = C.muted;
+      ctx.fillText(st.cssW >= 720
+        ? '|u| = 这一步的加速度大小，rho = 惩罚项，tau = 这一步的时长 —— 猛踩油门要付钱，磨时间也要付钱'
+        : '|u| = 加速度大小, rho = 惩罚项, tau = 时长', 16, 46);
+    }
+
+    /* ---------- 右块的可用范围（左块据此决定是否铺满整幅） ---------- */
+    function stackBox() {
+      var W = st.cssW;
+      var x0 = Math.max(W / 2 + 22, W * 0.53);
+      var x1 = W - 16;
+      return { x0: x0, x1: x1, w: x1 - x0, fits: (x1 - x0) >= 130 };
+    }
+
+    /* ---------- 分隔虚线 ---------- */
+    function drawDivider() {
+      if (!stackBox().fits) return;                        // 右块画不出来时不需要分隔线
+      var x = Math.round(st.cssW / 2) + 0.5;
+      ctx.save();
+      ctx.setLineDash([4, 6]);
+      ctx.strokeStyle = C.grid;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, 56);
+      ctx.lineTo(x, H_CSS - 18);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* ---------- 左块：柱状图（7 个离散档位的原语代价） ---------- */
+    function drawBars() {
+      var W = st.cssW;
+      var leftOnly = !stackBox().fits;                     // 右块放不下时，左块铺满整幅
+      var lx0 = 46;                                        // 左侧内边距：放纵轴刻度与纵轴名
+      var lx1 = leftOnly
+        ? W - 24
+        : Math.max(lx0 + 96, Math.min(W / 2 - 26, W - 24)); // 右侧也留 24px 内边距
+      var ly0 = 72;
+      var ly1 = H_CSS - 62;
+      var plotH = ly1 - ly0;
+      if (plotH < 60) ly0 = ly1 - 60;
+      plotH = ly1 - ly0;
+
+      // 纵轴量程：最高档 |u| = 3 的代价，再留一点头部空间
+      var yMax = edgeCost(U_SLIDER_MAX) * 1.12;
+      if (!(yMax > 0)) yMax = 1;
+      var Yv = function (v) { return ly1 - (v / yMax) * plotH; };
+
+      var n = 2 * U_SLIDER_MAX + 1;                       // u ∈ {-3..3} 共 7 档
+      var slotW = (lx1 - lx0) / n;
+      var barW = Math.max(8, slotW * 0.56);
+      var i, u, cx, hgt, col;
+
+      // 横向网格 + 纵轴刻度
+      var step = niceStep(yMax, 4);
+      ctx.font = '10px ' + MONO;
+      ctx.textAlign = 'right';
+      for (var v = 0; v <= yMax + 1e-9; v += step) {
+        var gy = Math.round(Yv(v)) + 0.5;
+        ctx.strokeStyle = v === 0 ? C.axis : C.grid;
+        ctx.lineWidth = v === 0 ? 1.2 : 1;
+        ctx.beginPath(); ctx.moveTo(lx0, gy); ctx.lineTo(lx1, gy); ctx.stroke();
+        ctx.fillStyle = C.muted;
+        ctx.fillText(trimNum(v, step), lx0 - 7, gy + 3.5);
+      }
+      // 纵轴名（放在纵轴上方，右对齐到刻度标签的位置，不越出左内边距）
+      ctx.textAlign = 'right';
+      ctx.font = '11px ' + FONT;
+      ctx.fillStyle = C.muted;
+      ctx.fillText('代价', lx0 - 7, ly0 - 10);
+
+      // 柱子
+      for (i = 0; i < n; i++) {
+        u = i - U_SLIDER_MAX;                             // -3 .. 3
+        cx = lx0 + slotW * (i + 0.5);
+        var val = edgeCost(Math.abs(u));
+        hgt = (val / yMax) * plotH;
+        if (hgt < 2) hgt = 2;                             // 0 代价也给一条可见的底座
+        col = rampColor(Math.abs(u) / U_SLIDER_MAX);
+        ctx.fillStyle = rgba(col, Math.abs(u) === 0 ? 0.55 : 0.85);
+        ctx.fillRect(cx - barW / 2, ly1 - hgt, barW, hgt);
+
+        // 横轴刻度标签（用 |u| 标注，左右两半是对称的）
+        ctx.font = '10px ' + MONO;
+        ctx.fillStyle = C.muted;
+        ctx.textAlign = 'center';
+        ctx.fillText(String(Math.abs(u)), cx, ly1 + 15);
+      }
+
+      // 与滑块 |u| 最接近的那一档：白描边高亮 + 柱顶标数值
+      var lv = Math.max(0, Math.min(U_SLIDER_MAX, Math.round(st.u)));
+      var hiIdx = U_SLIDER_MAX + lv;                      // u = +lv 的那根柱子
+      var hx = lx0 + slotW * (hiIdx + 0.5);
+      var hval = edgeCost(lv);
+      var hh = Math.max(2, (hval / yMax) * plotH);
+
+      ctx.save();
+      ctx.strokeStyle = C.ink;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(hx - barW / 2 - 1, ly1 - hh - 1, barW + 2, hh + 2);
+      ctx.restore();
+
+      // 柱顶数值框：左右都夹在绘图区内，保证不被画布边界裁掉
+      var label = fmt3(hval);
+      ctx.font = '11px ' + MONO;
+      var tw = ctx.measureText(label).width;
+      var boxW = tw + 8;
+      var bx = Math.max(lx0, Math.min(hx - boxW / 2, lx1 - boxW));
+      var byTop = Math.max(ly0 - 16, ly1 - hh - 20);
+      ctx.fillStyle = 'rgba(15,23,48,.9)';
+      roundRect(ctx, bx, byTop, boxW, 16, 4);
+      ctx.fill();
+      ctx.fillStyle = C.ink;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, bx + boxW / 2, byTop + 12);
+
+      // 滑块的真实值（可能落在两个档位之间）—— 左右对称各画一条虚线
+      // 横轴是线性轴：u 每 +1 正好走一个 slotW，u = 0 落在中间那格的格心
+      var xOfU = function (uu) { return lx0 + slotW * (U_SLIDER_MAX + 0.5 + uu); };
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(255,180,84,.75)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(xOfU(st.u), ly0 - 2); ctx.lineTo(xOfU(st.u), ly1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(xOfU(-st.u), ly0 - 2); ctx.lineTo(xOfU(-st.u), ly1); ctx.stroke();
+      ctx.restore();
+
+      // 横轴名
+      ctx.textAlign = 'center';
+      ctx.font = '11px ' + FONT;
+      ctx.fillStyle = C.muted;
+      ctx.fillText(st.cssW >= 620 ? '|u| (m/s^2)  —— 离散加速度档位' : '|u| (m/s^2)', (lx0 + lx1) / 2, ly1 + 32);
+      ctx.font = '10px ' + MONO;
+      ctx.fillStyle = C.orange;
+      ctx.fillText('橙色虚线 = 当前 |u| = ' + st.u.toFixed(1), (lx0 + lx1) / 2, ly1 + 48);
+    }
+
+    /* ---------- 右块：5 段原语堆叠出 g_c ---------- */
+    function drawStack() {
+      var box = stackBox();
+      if (!box.fits) return;                              // 实在太窄就只保留左块
+      var rx0 = box.x0;
+      var rx1 = box.x1;
+
+      var ec = edgeCost(st.u);
+      var gc = J * ec;
+      // 量程：|u| 拉满（= 3）时的 g_c，这样条长直接读出“离最贵还有多远”
+      var gcMax = J * edgeCost(U_SLIDER_MAX);
+      var ratio = gcMax > 0 ? Math.max(0, Math.min(1, gc / gcMax)) : 0;
+
+      var narrow = (rx1 - rx0) < 258;
+      // 窄画布时不把 g_c 数值放在条右边（下方展开式里已经有了），让条占满整块；
+      // 宽画布时在数值标签前留 124px（其中 16px 是标签与色条之间的间距）
+      var totalW = Math.max(48, rx1 - rx0 - (narrow ? 6 : 124));
+      var barW = totalW * ratio;
+      // 每段至少 10px，窄窗口下 5 个色块才不会糊成一条（代价为 0 时不画）
+      if (barW > 0.5) barW = Math.max(barW, Math.min(totalW, J * 10));
+      var barH = 36;
+      var by = 80;
+
+      // 小标题
+      ctx.textAlign = 'left';
+      ctx.font = '12px ' + FONT;
+      ctx.fillStyle = C.ink;
+      ctx.fillText(narrow ? J + ' 段轨迹的 g_c' : '一条 ' + J + ' 段轨迹的真实代价 g_c', rx0, by - 22);
+
+      // 堆叠条：每段 = 一个原语的代价 (|u|²+ρ)τ
+      var segW = barW / J;
+      var mode = segW >= 44 ? 'in' : (segW >= 30 ? 'above' : 'one');   // 段太窄就不逐段标注
+      var j, sx;
+      for (j = 0; j < J; j++) {
+        sx = rx0 + j * segW;
+        ctx.fillStyle = SEG_COLORS[j % SEG_COLORS.length];
+        ctx.fillRect(sx, by, segW, barH);
+        if (j > 0) {                                      // 段之间的底色小缝
+          ctx.fillStyle = C.bg;
+          ctx.fillRect(sx - 1, by, 2, barH);
+        }
+        if (mode === 'in') {
+          ctx.font = '11px ' + MONO;
+          ctx.fillStyle = C.panel;
+          ctx.textAlign = 'center';
+          ctx.fillText(fmt3(ec), sx + segW / 2, by + barH / 2 + 4);
+        }
+      }
+      if (mode === 'above') {
+        ctx.font = '10px ' + MONO;
+        ctx.textAlign = 'center';
+        for (j = 0; j < J; j++) {
+          sx = rx0 + (j + 0.5) * segW;
+          ctx.fillStyle = C.muted;
+          ctx.fillText(fmt3(ec), sx, by - 6);
+          ctx.fillStyle = rgba(hex2rgb(SEG_COLORS[j % SEG_COLORS.length]), 0.9);
+          ctx.fillRect(sx - 0.5, by - 3, 1, 3);
+        }
+      } else if (mode === 'one') {
+        ctx.font = '10px ' + MONO;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = C.muted;
+        ctx.fillText(J + ' 段 x ' + fmt3(ec), rx0 + barW / 2, by - 6);
+      }
+
+      // 条的外框（让“未占满”的部分也能看出量程）
+      ctx.strokeStyle = C.axis;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rx0 + 0.5, by + 0.5, totalW - 1, barH - 1);
+
+      // 总量标签（宽画布时放在条右边，与色条之间留 16px 间距）
+      if (!narrow) {
+        ctx.textAlign = 'left';
+        ctx.font = '12px ' + MONO;
+        ctx.fillStyle = C.ink;
+        ctx.fillText('g_c = ' + fmt3(gc), rx0 + totalW + 16, by + barH / 2 + 4);
+      }
+
+      // 展开式与量程说明
+      var yb = by + barH;
+      ctx.textAlign = 'left';
+      ctx.font = '11px ' + MONO;
+      ctx.fillStyle = C.muted;
+      if (narrow) {
+        ctx.fillText('g_c = ' + J + ' x ' + fmt3(ec) + ' = ' + fmt3(gc), rx0, yb + 26);
+        ctx.fillText('满格 ' + fmt3(gcMax) + ' | 当前 ' + (ratio * 100).toFixed(0) + '%', rx0, yb + 44);
+        ctx.fillStyle = C.blue;
+        ctx.fillText('g_temp = g_c + EdgeCost', rx0, yb + 70);
+        ctx.fillText('= ' + fmt3(gc) + ' + ' + fmt3(ec) + ' = ' + fmt3(gc + ec), rx0, yb + 88);
+        ctx.fillStyle = C.purple;
+        ctx.fillText('f_c = g_c + Heuristic', rx0, yb + 106);
+      } else {
+        ctx.fillText('g_c = sum_{j=1..' + J + '} (|u_j|^2 + rho) * tau = ' + J + ' * ' + fmt3(ec) +
+          ' = ' + fmt3(gc), rx0, yb + 30);
+        ctx.fillText('满格 = |u| = 3.0（rho, tau 不变）时的 g_c = ' + fmt3(gcMax) +
+          '，当前占 ' + (ratio * 100).toFixed(1) + '%', rx0, yb + 50);
+        ctx.fillStyle = C.blue;
+        ctx.fillText('g_temp = n_c.g_c + EdgeCost(n_i) = ' + fmt3(gc) + ' + ' + fmt3(ec) +
+          ' = ' + fmt3(gc + ec), rx0, yb + 78);
+        ctx.fillStyle = C.purple;
+        ctx.fillText('f_c = g_c + Heuristic：g_c 越大，越晚被扩展', rx0, yb + 96);
+      }
+    }
+
+    /* ---------- 主绘制 ---------- */
+    function draw() {
+      var W = st.cssW, H = H_CSS;
+      ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      drawHeader();
+      drawDivider();
+      drawBars();
+      drawStack();
+    }
+
+    /* ---------- 事件 ---------- */
+    function refresh() {
+      readControls();
+      syncReadouts();
+      draw();
+    }
+    function onResize() {
+      if (resizePending) return;
+      resizePending = true;
+      requestAnimationFrame(function () {
+        resizePending = false;
+        fitCanvas();
+        draw();
+      });
+    }
+
+    if (elU) elU.addEventListener('input', refresh);
+    if (elTau) elTau.addEventListener('input', refresh);
+    if (elRho) elRho.addEventListener('input', refresh);
+    window.addEventListener('resize', onResize);
+
+    /* ---------- 启动 ---------- */
+    fitCanvas();
+    refresh();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+<script>
+/* ===== heuristic.js ===== */
+/*!
+ * heuristic.js —— Fast-Planner 前端（Hybrid A*）启发式代价交互演示
+ * ---------------------------------------------------------------------------
+ * 这段代码在教什么：
+ *   Hybrid A* 的启发式 Heuristic(n) 不是欧氏距离，而是一个「两点边值最优控制
+ *   问题（BVP）」的最小控制代价解：给定当前状态 (p_c, v_c) 与目标状态 (p_g, v_g)，
+ *   在所有能把当前状态送到目标状态的三次多项式轨迹里，找控制代价最小的那条。
+ *   由 Pontryagin 最小原理可得：
+ *       p(t) = (1/6) * alpha * t^3 + (1/2) * beta * t^2 + v_c * t + p_c
+ *       u(t) = alpha * t + beta          <-- 控制（加速度）随时间线性变化
+ *       A = p_g - p_c - v_c * T ,  B = v_g - v_c
+ *       alpha = (-12A + 6T*B) / T^3 ,  beta = (6T*A - 2T^2*B) / T^3
+ *       cost(T) = ∫ u(t)^2 dt = alpha^2*T^3/3 + alpha*beta*T^2 + beta^2*T
+ *   然后在时间 T 上挑出最优的 T（记作 T_h），并用 cost(T_h) 作为 Heuristic(n)，
+ *   于是 f_c = g_c + Heuristic（代码里 T_h 取"可行域左边界"，理由见下面的数学结论）。
+ *
+ *   本演示用两个 canvas 讲清这件事：
+ *     1) #cv-heur      ：在同一个 t 坐标系里画 p(t)（蓝，左轴 m）与 u(t)（红，右轴 m/s^2）
+ *     2) #cv-heur-cost ：画 cost(T) 随 T 的变化，并标出最优 T_h（橙）与当前滑块 T（红）
+ *
+ *   重要数学结论（代码里也会在画布上写出来，避免学生误以为"T 越大越好"）：
+ *     在 v_c = 0 的情形下可解析求导得到  dcost/dT = -4 * (T*v_g - 3d)^2 / T^4 <= 0，
+ *     也就是代价关于 T 单调不增 —— 自由末端时间的最小控制代价问题本身是退化的
+ *     （T -> ∞ 时代价 -> 0）。所以本演示引入演示用的加速度上限 a_max：
+ *     |u|_max <= a_max 才是"轨迹可行"的物理约束，最优的 T 就取在可行域的左边界上，
+ *     这也正是"T 过小，无法在这么短时间内从 p_c 到 p_g"的那条界线。
+ *
+ * 运行约束：传统 script（IIFE 包裹），无 ES module / import / export，无任何外部库、
+ * 无网络请求，可直接用 file:// 打开。
+ */
+(function () {
+  'use strict';
+
+  /* =========================================================================
+   * 0. 配色 / 字体 / 数值常量（全部硬编码，不依赖页面 CSS）
+   * ========================================================================= */
+  var COLOR = {
+    bg: '#0f1730',      // 画布背景
+    grid: '#24304f',    // 网格
+    text: '#e8ecf8',    // 主文字
+    dim: '#9aa7c7',     // 次要文字
+    blue: '#4ea1ff',    // 位置 p(t) / 代价曲线（可行段）
+    teal: '#39e0b0',    // 起点 p_c, v_c
+    orange: '#ffb454',  // 终点 p_g, v_g / 最优 T_h
+    red: '#ff5c7a',     // 加速度 u(t) / 当前滑块 T / 不可行段
+    purple: '#a78bfa'   // 当前 T 的竖直虚线 / 驻点
+  };
+  var FONT_STACK = 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif';
+  function fontOf(px, weight) {
+    return (weight ? weight + ' ' : '') + px + 'px ' + FONT_STACK;
+  }
+
+  // 起点速度固定为 0（页面没有提供 v_c 滑块，按题目约定简化）
+  var V_C = 0;
+
+  /* ---------------------------------------------------------------------
+   * 演示用的加速度上限 A_MAX（m/s^2）—— 这是判断"轨迹可行"的唯一物理约束：
+   *   峰值 |u|max = max(|beta|, |alpha*T + beta|) <= A_MAX  才算可行。
+   * 真实四旋翼的加速度上限比这还小（约 1~2 g）；这里取 5 m/s^2，是因为：
+   *   峰值 |u|max ≈ 6*Δp / T^2（v_c = 0 时），故可行域左边界 T_h ≈ sqrt(6*Δp / A_MAX)。
+   *   默认参数 Δp = 5 m、v_g = 0、T = 1 s 时峰值 |u|max = 30 m/s^2 > 5，判为不可行；
+   *   而 T_h ≈ sqrt(30/5) = 2.449 s 正好落在可行域边界上 —— 这就是本演示要讲的结论：
+   *   代价 cost(T) 关于 T 单调不增，所以"代价最小且可行"的最优时间就取在可行域边界。
+   * 把 A_MAX 改大，T_h 会变小（A_MAX = 100 时 T_h ≈ 0.55 s）；改小则 T_h 变大。
+   * --------------------------------------------------------------------- */
+  var A_MAX = 5;
+
+  // 代价里的时间权重 ρ 的兜底值（页面滑块 #heur-rho 的默认值是 2.0，量程 0–3）
+  // ρT 这一项是必须的：没有它时 cost(T) 关于 T 单调递减，"最小代价"没有有限解（退化）。
+  var RHO_DEF = 2.0, RHO_MIN = 0, RHO_MAX = 3;
+
+  // 代价曲线采样：左端固定 0.05 s，右端跟随 #heur-t 的 max（页面为 8 s），共 900 点
+  var T_LO = 0.05, T_HI_DEF = 8.0, T_N = 900;
+  // 控件默认值 / 兜底量程（页面上滑块的 min/max/step 优先，这里只是读不到时的兜底）
+  var T_DEF = 1.0, T_MIN = 0.2, T_MAX = 8.0, T_STEP = 0.02;
+  var DP_DEF = 5.0, DP_MIN = 1, DP_MAX = 10;
+  var DV_DEF = 0, DV_MIN = -2, DV_MAX = 2;
+
+  /* =========================================================================
+   * 1. 数学核心：两点边值问题（BVP）与最小控制代价
+   * ========================================================================= */
+
+  /**
+   * 解单轴的两点边值问题。
+   * @param {number} d  目标相对当前位置的位移 p_g - p_c（m）
+   * @param {number} vc 起点速度（m/s）
+   * @param {number} vg 终点速度（m/s）
+   * @param {number} T  给定的总时间（s），必须 > 0
+   * @param {number} rho 代价里的时间权重（>= 0），cost 里加 rho*T
+   * @returns {Object} {ok, alpha, beta, cost, uPeak, u0, u1, reason}
+   *   ok=false 表示这个 T 不可行（或输入非法），此时不要用 alpha/beta 画图。
+   *
+   * 推导要点（写在注释里方便对照板书）：
+   *   A = d - vc*T,  B = vg - vc
+   *   [alpha; beta] = (1/T^3) * [[-12, 6T], [6T, -2T^2]] * [A; B]
+   *   u(t) = alpha*t + beta 是 t 的一次函数 => 极值只可能在两端取到，
+   *   所以峰值 |u|_max = max(|beta|, |alpha*T + beta|)。
+   *   代价 cost(T) = ∫u^2 dt + rho*T = alpha^2*T^3/3 + alpha*beta*T^2 + beta^2*T + rho*T
+   *   （二维/三维时：每轴各算 ∫u^2 dt 再相加，但 rho*T 只加一次，因为 T 是三轴共享的）
+   */
+  function solveBvp(d, vc, vg, T, rho) {
+    if (!isFinite(rho) || rho < 0) rho = 0;
+    if (!isFinite(d) || !isFinite(vc) || !isFinite(vg) || !isFinite(T) || T <= 0) {
+      return { ok: false, T: T, alpha: NaN, beta: NaN, cost: NaN, uPeak: Infinity, u0: NaN, u1: NaN, reason: 'bad-input' };
+    }
+    var T2 = T * T, T3 = T2 * T;
+    var A = d - vc * T;
+    var B = vg - vc;
+    var alpha = (-12 * A + 6 * T * B) / T3;
+    var beta = (6 * T * A - 2 * T2 * B) / T3;
+    var u0 = beta;                 // u(0)
+    var u1 = alpha * T + beta;     // u(T)
+    var uPeak = Math.max(Math.abs(u0), Math.abs(u1));
+    // 控制代价 = alpha^2*T^3/3 + alpha*beta*T^2 + beta^2*T（= ∫u^2 dt）
+    var ctrl = alpha * alpha * T3 / 3 + alpha * beta * T2 + beta * beta * T;
+    if (ctrl < 0 && ctrl > -1e-9) ctrl = 0;   // 浮点抵消保护（数学上 ∫u^2 dt >= 0）
+    var cost = ctrl + rho * T;                // 加上时间项 rho*T
+
+    if (!isFinite(alpha) || !isFinite(beta) || !isFinite(cost) || !isFinite(uPeak)) {
+      return { ok: false, T: T, alpha: NaN, beta: NaN, cost: NaN, uPeak: Infinity, u0: NaN, u1: NaN, reason: 'non-finite' };
+    }
+    var feasible = uPeak <= A_MAX * (1 + 1e-12);
+    return {
+      ok: feasible, feasible: feasible, T: T, A: A, B: B,
+      alpha: alpha, beta: beta, cost: cost, ctrl: ctrl, u0: u0, u1: u1, uPeak: uPeak,
+      reason: feasible ? '' : 'accel-limit'
+    };
+  }
+
+  /** 只要代价时用的轻量封装（采样曲线时调用 900 次） */
+  function costAt(d, vc, vg, T, rho) {
+    return solveBvp(d, vc, vg, T, rho).cost;
+  }
+
+  /** 位置轨迹 p(t)：p_c 取 0，所以 p(t) 就是相对位移 */
+  function posAt(alpha, beta, p0, v0, t) {
+    return alpha * t * t * t / 6 + beta * t * t / 2 + v0 * t + p0;
+  }
+
+  /**
+   * cost(T) 对 T 的解析导数（本演示固定 v_c = 0）：
+   *   dcost/dT = -4*(T*v_g - 3d)^2 / T^4 + rho
+   * 前半项是 d(∫u^2 dt)/dT（已用有限差分核对过），后半项来自时间惩罚 rho*T。
+   * rho > 0 时这个方程有实根 —— "∂T/∂T = 0 求根" 才真正成立；
+   * rho = 0 时导数 <= 0 恒成立（退化），只能靠 |u| <= a_max 的可行域边界兜底。
+   */
+  function costDeriv(d, vg, T, rho) {
+    if (!(T > 0)) return NaN;
+    var q = T * vg - 3 * d;
+    var t4 = T * T * T * T;
+    return -4 * q * q / t4 + (isFinite(rho) ? rho : 0);
+  }
+
+  /**
+   * 在可行域左边界上把 T 细化一下（最小可行 T）：
+   * 采样网格给出大致位置，这里对它左侧的不可行点做二分，让边界值更准。
+   */
+  function refineFeasibleLeft(d, vc, vg, rho, tHi, Tseed) {
+    var step = (tHi - T_LO) / (T_N - 1);
+    var lo = Tseed - step, hi = Tseed;
+    if (!(lo > T_LO)) return Tseed;
+    if (!solveBvp(d, vc, vg, hi, rho).ok) return Tseed;   // 种子点都不可行就不细化
+    if (solveBvp(d, vc, vg, lo, rho).ok) return Tseed;    // 左邻也可行（少见）就不细化
+    for (var k = 0; k < 30; k++) {
+      var mid = 0.5 * (lo + hi);
+      if (solveBvp(d, vc, vg, mid, rho).ok) { hi = mid; } else { lo = mid; }
+    }
+    return hi;
+  }
+
+  /** 对 dcost/dT 做二分，细化一个驻点（要求两端导数值异号：负 -> 正，即极小点） */
+  function refineStationary(d, vg, rho, lo, hi) {
+    for (var k = 0; k < 48; k++) {
+      var mid = 0.5 * (lo + hi);
+      if (costDeriv(d, vg, mid, rho) < 0) { lo = mid; } else { hi = mid; }
+    }
+    return 0.5 * (lo + hi);
+  }
+
+  /**
+   * 扫一遍 T ∈ [T_LO, tHi]（tHi 跟随 #heur-t 的 max），返回：
+   *  - samples：可画的 (T, cost, 是否可行) 采样点（跳过非有限值与非正值，供对数轴用）
+   *  - th / thCost / uPeakAtTh：T_h = 在扫描区间内"代价最小且满足 |u|max <= a_max"的 T
+   *      branch = 'interior'     内点最优：∂cost/∂T = 0 的根（rho > 0 的正常情形）
+   *      branch = 'accel-bound'  内点最优加速度超限，只能取可行域左边界
+   *      branch = 'degenerate'   rho = 0：代价单调递减，没有有限最优，退回可行域左边界
+   *      branch = 'infeasible'   整个区间都加速度超限（界面会给出提示，不会出 NaN）
+   *  - interiorT：内点驻点（即使不可行也记下来，用于状态文字说明）
+   *  - feasibleLeft：可行域左边界（最小可行 T）
+   */
+  function scanT(d, vc, vg, rho, tHi) {
+    if (!(tHi > T_LO)) tHi = T_HI_DEF;
+    var samples = [];
+    var firstFeasible = null, bestAny = null, lastIsFeasible = false;
+    for (var i = 0; i < T_N; i++) {
+      var T = T_LO + (tHi - T_LO) * i / (T_N - 1);
+      var r = solveBvp(d, vc, vg, T, rho);
+      var rec = { T: T, cost: r.cost, uPeak: r.uPeak, feasible: r.ok };
+      if (isFinite(r.cost) && r.cost > 0) samples.push(rec);
+      if (isFinite(r.cost)) {
+        if (!bestAny || r.cost < bestAny.cost) bestAny = rec;
+        if (r.ok && !firstFeasible) firstFeasible = rec;
+      }
+      if (i === T_N - 1) lastIsFeasible = r.ok;
+    }
+
+    // 1) 可行域左边界（最小可行 T）
+    var feasT = NaN, feasCost = NaN, feasPeak = NaN;
+    if (firstFeasible) {
+      feasT = refineFeasibleLeft(d, vc, vg, rho, tHi, firstFeasible.T);
+      var rf = solveBvp(d, vc, vg, feasT, rho);
+      if (rf.ok && isFinite(rf.cost)) { feasCost = rf.cost; feasPeak = rf.uPeak; }
+      else { feasT = firstFeasible.T; feasCost = firstFeasible.cost; feasPeak = firstFeasible.uPeak; }
+    } else if (lastIsFeasible === false && !firstFeasible) {
+      feasT = NaN;    // 整个区间都不可行
+    }
+
+    // 2) 内点驻点：扫描 dcost/dT 由负变正的位置（= cost 的极小点），再二分细化
+    var interior = [];
+    var step = (tHi - T_LO) / (T_N - 1);
+    var pT = T_LO, pg = costDeriv(d, vg, pT, rho);
+    for (i = 1; i < T_N; i++) {
+      var Ti = T_LO + step * i;
+      var gi = costDeriv(d, vg, Ti, rho);
+      if (isFinite(pg) && isFinite(gi) && pg < 0 && gi > 0) {
+        interior.push(refineStationary(d, vg, rho, pT, Ti));
+      }
+      pT = Ti; pg = gi;
+    }
+
+    // 3) 在可行候选里取代价最小者：内点驻点优先（它才是 ∂cost/∂T = 0 的解）
+    var th = NaN, thCost = NaN, uPeakAtTh = NaN, branch = 'infeasible';
+    var interiorT = NaN, interiorFeasible = false;
+    for (i = 0; i < interior.length; i++) {
+      var ri = solveBvp(d, vc, vg, interior[i], rho);
+      if (!isFinite(ri.cost)) continue;
+      if (!isFinite(interiorT) || ri.cost < solveBvp(d, vc, vg, interiorT, rho).cost) {
+        interiorT = interior[i];
+        interiorFeasible = ri.ok;
+      }
+      if (ri.ok && (!isFinite(thCost) || ri.cost < thCost)) {
+        th = interior[i]; thCost = ri.cost; uPeakAtTh = ri.uPeak; branch = 'interior';
+      }
+    }
+    if (!isFinite(th) && rho > 0) {
+      // ρ > 0 但区间内没有驻点、且右端导数仍为负：说明真正的最优 T 比扫描区间右端还大，
+      // 此时区间内"代价最小且可行"的点就是右端（ρ 越小最优 T 越长）。
+      var gEnd = costDeriv(d, vg, tHi, rho);
+      if (isFinite(gEnd) && gEnd < 0) {
+        var rEnd = solveBvp(d, vc, vg, tHi, rho);
+        if (rEnd.ok && isFinite(rEnd.cost)) {
+          th = tHi; thCost = rEnd.cost; uPeakAtTh = rEnd.uPeak; branch = 'window-edge';
+        }
+      }
+    }
+    if (!isFinite(th) && isFinite(feasT)) {
+      th = feasT; thCost = feasCost; uPeakAtTh = feasPeak;
+      branch = (rho > 0) ? 'accel-bound' : 'degenerate';
+    }
+    if (!isFinite(th) && bestAny) {                 // 全域不可行：给个参考值，保证界面不空
+      th = bestAny.T; thCost = bestAny.cost; uPeakAtTh = bestAny.uPeak; branch = 'infeasible';
+    }
+
+    // 解析上 dcost/dT = 0 在 v_g ≠ 0 时还有一个退化的"拐点"根 T = 3d/v_g（rho = 0 时才落在图上）
+    var statT = NaN;
+    if (vg !== 0) {
+      var t0 = 3 * d / vg;
+      if (isFinite(t0) && t0 > T_LO && t0 < tHi) statT = t0;
+    }
+
+    return {
+      samples: samples, th: th, thCost: thCost, uPeakAtTh: uPeakAtTh,
+      branch: branch, interiorT: interiorT, interiorFeasible: interiorFeasible,
+      feasibleLeft: feasT, feasibleLeftCost: feasCost, statT: statT,
+      anyFeasible: !!firstFeasible, tHi: tHi, rho: rho
+    };
+  }
+
+  /* =========================================================================
+   * 2. 画布通用工具（devicePixelRatio 适配、坐标刻度、文字、箭头）
+   * ========================================================================= */
+
+  /**
+   * 按 CSS 尺寸 + devicePixelRatio 适配画布，并返回 CSS 像素尺寸。
+   * 注意：改了 canvas.width/height 会清空画布与状态，所以每次绘制都要重设 transform。
+   */
+  function fitCanvas(canvas, fallbackH) {
+    var ctx = canvas.getContext('2d');
+    var rect = null;
+    try { rect = canvas.getBoundingClientRect(); } catch (e) { rect = null; }
+
+    // 设计高度只读一次：canvas.height 是反射属性，赋值会改写 height 属性；
+    // 若每次都重新读属性，devicePixelRatio > 1 时设计高度会每帧乘以 dpr，画布指数级变高。
+    var attrH = canvas.__designH || parseFloat(canvas.getAttribute('height'));
+    if (attrH > 0) canvas.__designH = attrH;
+    // 宽度同理：canvas.width 也是反射属性，属性值会被后备缓冲尺寸改写，只能取一次
+    var attrW = canvas.__designW;
+    if (!(attrW > 0)) {
+      attrW = parseFloat(canvas.getAttribute('width'));
+      if (!(attrW > 0)) attrW = 300;          // canvas 默认固有宽度
+      canvas.__designW = attrW;
+    }
+
+    var w = (rect && rect.width > 2) ? rect.width : (canvas.clientWidth || 0);
+    var h = (rect && rect.height > 2) ? rect.height : (canvas.clientHeight || 0);
+    if (!(w > 2)) w = attrW;
+    if (!(h > 2)) h = (attrH > 0) ? attrH : fallbackH;
+
+    // 站点 CSS 只给了 canvas{width:100%}，浏览器会按 canvas 固有比例把高度撑出来，
+    // 所以这里始终把 CSS 高度钉回设计高度（attrH 是缓存的原始属性值）。
+    if (attrH > 0 && Math.abs(h - attrH) > 1) {
+      canvas.style.height = attrH + 'px';
+      h = attrH;
+    }
+
+    var dpr = window.devicePixelRatio || 1;
+    if (!(dpr > 0)) dpr = 1;
+    if (dpr > 3) dpr = 3;                       // 上限 3，避免超高 DPI 下后备缓冲过大
+    var bw = Math.max(1, Math.round(w * dpr));
+    var bh = Math.max(1, Math.round(h * dpr));
+    if (canvas.width !== bw) canvas.width = bw;
+    if (canvas.height !== bh) canvas.height = bh;
+    return { w: w, h: h, dpr: dpr, ctx: ctx };
+  }
+
+  function clearBg(ctx, vw) {
+    ctx.setTransform(vw.dpr, 0, 0, vw.dpr, 0, 0);
+    ctx.fillStyle = COLOR.bg;
+    ctx.fillRect(0, 0, vw.w, vw.h);
+  }
+
+  function text(ctx, str, x, y, color, px, align, weight) {
+    ctx.fillStyle = color;
+    ctx.font = fontOf(px || 12, weight);
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(str, x, y);
+  }
+
+  /**
+   * 在给定宽度内画文字：窄画布上自动缩小字号（最小 8px），实在放不下才截断加省略号。
+   * 这样宽度 400px 左右的小屏也不会出现文字跑到画布外面 / 几段说明互相压字。
+   */
+  function fitText(ctx, str, x, y, color, px, maxW, align, weight) {
+    if (!str) return;
+    var size = px;
+    ctx.font = fontOf(size, weight);
+    while (size > 8 && ctx.measureText(str).width > maxW) {
+      size -= 0.5;
+      ctx.font = fontOf(size, weight);
+    }
+    var s = str;
+    if (ctx.measureText(s).width > maxW) {
+      while (s.length > 1 && ctx.measureText(s + '…').width > maxW) { s = s.slice(0, -1); }
+      s += '…';
+    }
+    text(ctx, s, x, y, color, size, align, weight);
+  }
+
+  function box(ctx, x0, y0, x1, y1, color, lw) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw || 1;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y1); ctx.lineTo(x0, y1); ctx.closePath();
+    ctx.stroke();
+  }
+
+  function hline(ctx, x0, x1, y, color, lw, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = lw || 1;
+    if (dash && dash.length) { ctx.setLineDash(dash); }   // 只有真数组才交给 setLineDash
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.restore();
+  }
+
+  function vline(ctx, x, y0, y1, color, lw, dash) {
+    ctx.save();
+    ctx.strokeStyle = color; ctx.lineWidth = lw || 1;
+    if (dash && dash.length) { ctx.setLineDash(dash); }
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+    ctx.restore();
+  }
+
+  function dot(ctx, x, y, r, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function arrowHead(ctx, x, y, dx, dy, size, color) {
+    var a = Math.atan2(dy, dx), s = size;
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x - s * Math.cos(a - 0.42), y - s * Math.sin(a - 0.42));
+    ctx.moveTo(x, y); ctx.lineTo(x - s * Math.cos(a + 0.42), y - s * Math.sin(a + 0.42));
+    ctx.stroke();
+  }
+
+  /** 取"好看"的刻度间隔（1/2/2.5/5/10 系列） */
+  function niceStep(span, count) {
+    if (!(span > 0) || !(count > 0)) return 1;
+    var raw = span / count;
+    var mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10));
+    var n = raw / mag;
+    var mult = (n <= 1) ? 1 : (n <= 2) ? 2 : (n <= 2.5) ? 2.5 : (n <= 5) ? 5 : 10;
+    return mult * mag;
+  }
+
+  function ticks(min, max, count) {
+    var out = [];
+    if (!(max > min)) return out;
+    var step = niceStep(max - min, count);
+    if (!(step > 0)) return out;
+    for (var v = Math.ceil(min / step) * step; v <= max + step * 1e-9 && out.length < 40; v += step) {
+      out.push(Math.abs(v) < 1e-12 ? 0 : v);
+    }
+    return out;
+  }
+
+  /** 10 的整数次幂刻度（对数纵轴用） */
+  function logTicks(minV, maxV) {
+    var out = [];
+    if (!(minV > 0) || !(maxV > minV)) return out;
+    var e0 = Math.floor(Math.log(minV) / Math.LN10), e1 = Math.ceil(Math.log(maxV) / Math.LN10);
+    for (var e = e0; e <= e1 && out.length < 14; e++) {
+      var v = Math.pow(10, e);
+      if (v >= minV * 0.999 && v <= maxV * 1.001) out.push(v);
+    }
+    return out;
+  }
+
+  function tickLabel(v) {
+    if (!isFinite(v)) return '';
+    var a = Math.abs(v);
+    if (a === 0) return '0';
+    if (a >= 10000 || a < 0.01) {
+      return v.toExponential(0).replace('e+', 'e');   // 1e4 / 1e-3
+    }
+    return String(parseFloat(v.toFixed(3)));
+  }
+
+  /** 数值读数格式化：过大/过小时用科学计数法，避免读数框被撑爆 */
+  function fmtNum(x) {
+    if (!isFinite(x)) return '--';
+    var a = Math.abs(x);
+    if (a === 0) return '0.000';
+    if (a >= 100000 || a < 0.001) return x.toExponential(2).replace('e+', 'e');
+    return x.toFixed(3);
+  }
+
+  /* =========================================================================
+   * 3. 上方主画布：#cv-heur —— 同一 t 坐标下的 p(t) 与 u(t)
+   * ========================================================================= */
+
+  function drawMain(canvas, st, r, scan) {
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    var vw = fitCanvas(canvas, 320);
+    var w = vw.w, h = vw.h;
+    if (!(w > 40) || !(h > 40)) return;
+    clearBg(ctx, vw);
+
+    // 布局：给文字留出固定区域再画坐标轴 —— 上 48px（标题/副标题/轴单位）、
+    // 下 58px（时间刻度 + 公式；窄画布 78px 放 4 行）、左右各 60px（左右轴刻度与端点标签）
+    var narrow = w < 620;
+    var ml = 60, mr = 60, mt = 48, mb = narrow ? 78 : 58;
+    var pw = Math.max(24, w - ml - mr), ph = Math.max(24, h - mt - mb);
+    var X0 = ml, Y0 = mt, X1 = ml + pw, Y1 = mt + ph;
+
+    // 顶部文字区：标题 + 副标题 + 轴单位（ASCII 写法避免缺字形；窄画布用短版本）
+    text(ctx, 'Hybrid A* 启发式 Heuristic：两点边值最小控制代价', X0, 15, COLOR.text, 12, 'left', '600');
+    fitText(ctx,
+      narrow ? '蓝：p(t) 三次多项式　红：u(t) 线性'
+             : '蓝：p(t) 三次多项式（左轴）　红：u(t) = alpha*t + beta 线性（右轴）　箭头：端点速度方向（沿轨迹切线）',
+      X0, 31, COLOR.dim, 11, pw + mr - 8, 'left');
+    // 两条轴的单位分别居中画在各自轴线正上方，互不挤在一起
+    text(ctx, 'p (m)', X0, Y0 - 5, COLOR.dim, 10.5, 'center');
+    text(ctx, 'u (m/s²)', X1, Y0 - 5, COLOR.dim, 10.5, 'center');
+    // 与第 05 节的呼应：同一个 ρ 既在这里的时间惩罚里，也在边代价 e_c 里（宽画布才放得下）
+    if (!narrow) {
+      fitText(ctx, 'cost(T) = ∫u²dt + ρT，与第 05 节 e_c = (‖u‖²+ρ)τ 用的是同一个 ρ',
+        (X0 + X1) / 2, Y0 - 5, COLOR.dim, 10, Math.max(80, pw - 180), 'center');
+    }
+
+    var T = st.T, d = st.dp, vg = st.dv;
+
+    // ---------- 不可行：只给居中提示，不画曲线（防止超大/NaN 造成异常图形） ----------
+    if (!r || !r.ok || !isFinite(r.alpha) || !isFinite(r.beta)) {
+      box(ctx, X0, Y0, X1, Y1, COLOR.grid, 1);
+      var cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2;
+      var thTxt = isFinite(scan.th) ? ('T_h = ' + scan.th.toFixed(3) + ' s') : 'T_h = --';
+      text(ctx, 'T 过小，无法连接目标', cx, cy - 10, COLOR.orange, (w < 460 ? 14 : 17), 'center', '600');
+      text(ctx, '需要峰值加速度 |u|max = ' + fmtNum(r ? r.uPeak : NaN) + ' m/s^2  >  a_max = ' + A_MAX + ' m/s^2',
+        cx, cy + 14, COLOR.dim, 12, 'center');
+      text(ctx, '请把 T 调大（滑块 #heur-t），或点按钮自动吸附到最优 ' + thTxt + '（代价最小且可行）',
+        cx, cy + 34, COLOR.dim, 12, 'center');
+      return;
+    }
+
+    var tMax = Math.max(T * 1.22, 0.3);
+
+    // ---------- 采样 p(t)（p_c = 0），同时确定纵轴范围 ----------
+    var N = 240;
+    var pLo = Math.min(0, d), pHi = Math.max(0, d);
+    var ps = [];
+    for (var i = 0; i <= N; i++) {
+      var t = T * i / N;
+      var p = posAt(r.alpha, r.beta, 0, V_C, t);
+      ps.push({ t: t, p: p });
+      if (isFinite(p)) { if (p < pLo) pLo = p; if (p > pHi) pHi = p; }
+    }
+    var pPad = Math.max((pHi - pLo) * 0.14, 0.2);
+    pLo -= pPad; pHi += pPad;
+    if (!(pHi - pLo > 1e-9)) { pLo -= 0.5; pHi += 0.5; }
+
+    // 加速度轴范围：把 ±a_max 两条界限线也包进来，学生能直接看出是否超限
+    var uLo = Math.min(0, r.u0, r.u1, -A_MAX * 1.15);
+    var uHi = Math.max(0, r.u0, r.u1, A_MAX * 1.15);
+    var uPad = (uHi - uLo) * 0.04;
+    uLo -= uPad; uHi += uPad;
+    if (!(uHi - uLo > 1e-9)) { uLo -= 1; uHi += 1; }
+
+    function X(t) { return X0 + (t / tMax) * pw; }
+    function Yp(p) { return Y1 - ((p - pLo) / (pHi - pLo)) * ph; }
+    function Yu(u) { return Y1 - ((u - uLo) / (uHi - uLo)) * ph; }
+
+    // ---------- 网格与刻度 ----------
+    var i, tv;
+    var tTicks = ticks(0, tMax * 0.999, 5);
+    for (i = 0; i < tTicks.length; i++) {
+      vline(ctx, X(tTicks[i]), Y0, Y1, COLOR.grid, 1);
+      text(ctx, tickLabel(tTicks[i]), X(tTicks[i]), Y1 + 15, COLOR.dim, 10, 'center');
+    }
+    text(ctx, 't (s)', X1, Y1 + 15, COLOR.dim, 10, 'right');
+
+    var pTicks = ticks(pLo, pHi, 5);
+    for (i = 0; i < pTicks.length; i++) {
+      hline(ctx, X0, X1, Yp(pTicks[i]), COLOR.grid, 1);              // 左轴（位置 m）水平网格
+      text(ctx, tickLabel(pTicks[i]), X0 - 6, Yp(pTicks[i]) + 3.5, COLOR.dim, 10, 'right');
+    }
+    var uTicks = ticks(uLo, uHi, 5);
+    for (i = 0; i < uTicks.length; i++) {
+      hline(ctx, X0, X1, Yu(uTicks[i]), COLOR.grid, 1, [3, 4]);      // 右轴（加速度 m/s^2）虚线网格
+      text(ctx, tickLabel(uTicks[i]), X1 + 6, Yu(uTicks[i]) + 3.5, COLOR.dim, 10, 'left');
+    }
+    hline(ctx, X0, X1, Yp(0), COLOR.grid, 1, [5, 4]);      // p = p_c = 0 参考线
+    hline(ctx, X0, X1, Yu(0), COLOR.grid, 1, [2, 3]);      // u = 0 参考线
+    box(ctx, X0, Y0, X1, Y1, COLOR.grid, 1);
+
+    // ±a_max 可行界（加速度上限）：标签贴线画，但保证不顶到画布/坐标轴上边缘
+    var yUp = Yu(A_MAX), yDn = Yu(-A_MAX);
+    hline(ctx, X0, X1, yUp, COLOR.red, 1, [6, 5]);
+    hline(ctx, X0, X1, yDn, COLOR.red, 1, [6, 5]);
+    var upAbove = (yUp - 6 > Y0 + 8);
+    text(ctx, narrow ? '+a_max = ' + A_MAX : 'u = +a_max = ' + A_MAX, X0 + 6, upAbove ? yUp - 6 : yUp + 13, COLOR.red, 10, 'left');
+    var dnBelow = (yDn + 13 < Y1 - 4);
+    text(ctx, narrow ? '-a_max' : 'u = -a_max', X0 + 6, dnBelow ? yDn + 13 : yDn - 6, COLOR.red, 10, 'left');
+
+    // ---------- 曲线 ----------
+    ctx.save();
+    ctx.beginPath(); ctx.rect(X0, Y0, pw, ph); ctx.clip();
+
+    // p(t)：蓝色实线（三次多项式）
+    ctx.strokeStyle = COLOR.blue; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (i = 0; i < ps.length; i++) {
+      var px = X(ps[i].t), py = Yp(ps[i].p);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // u(t)：红色实线，只有两个端点 —— 一眼看出它是线性函数
+    ctx.strokeStyle = COLOR.red; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X(0), Yu(r.u0));
+    ctx.lineTo(X(T), Yu(r.u1));
+    ctx.stroke();
+
+    // ---------- 状态箭头：起点/终点的速度（长度与 |v| 成比例，方向沿轨迹切线） ----------
+    var sx = pw / tMax, sy = ph / (pHi - pLo);
+    function velArrow(tAt, pAt, vval, color) {
+      var bx = X(tAt), by = Yp(pAt);
+      var dx = sx, dy = -vval * sy;               // (dt, dp) = (1, v) 的像素方向
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (!(len > 1e-9)) { dx = 1; dy = 0; len = 1; } else { dx /= len; dy /= len; }
+      var L = Math.min(90, Math.abs(vval) * 24);  // 长度 ∝ |v|
+      if (L < 8) {                                // v ≈ 0：画一小段水平短线表示零速度
+        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + 18, by); ctx.stroke();
+        arrowHead(ctx, bx + 18, by, 1, 0, 6, color);
+        return { x: bx + 18, y: by };
+      }
+      var tx = bx + dx * L, ty = by + dy * L;
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty); ctx.stroke();
+      arrowHead(ctx, tx, ty, dx, dy, 6.5, color);
+      return { x: tx, y: ty };
+    }
+    velArrow(0, 0, V_C, COLOR.teal);      // 起点速度箭头（v_c = 0 时画一小段水平短线）
+    velArrow(T, d, vg, COLOR.orange);     // 终点速度箭头
+    ctx.restore();
+
+    dot(ctx, X(0), Yp(0), 4.5, COLOR.teal);      // 起点 p_c, v_c
+    dot(ctx, X(T), Yp(d), 4.5, COLOR.orange);    // 终点 p_g, v_g
+
+    /* 端点状态标签：每个端点用"两行文字块"，并做上下避让；横向一律离开 T 竖直虚线 16px 以上，
+       这样标签既不会互相压字，也不会和"T = ..."标签、T 虚线挤在一起。
+       起点：块放在点的右下方（下方没空间就搬到上方）；
+       终点：块放在点的左侧（上方没空间就改到点下方），不再贴着 T 虚线画。 */
+    var rowGap = 15;
+    var sy = Yp(0);
+    var startBelow = (sy + 2 * rowGap + 6 <= Y1);
+    text(ctx, 'start: p_c = 0.00 m', X(0) + 10, startBelow ? sy + rowGap + 2 : sy - rowGap - 3, COLOR.teal, 10.5, 'left');
+    text(ctx, 'v_c = ' + V_C.toFixed(2) + ' m/s', X(0) + 10, startBelow ? sy + 2 * rowGap + 2 : sy - 2 * rowGap - 3, COLOR.teal, 10.5, 'left');
+
+    var gy = Yp(d), gx = X(T);
+    var goalAbove = (gy - 2 * rowGap - 6 >= Y0);
+    var gRow1 = goalAbove ? gy - rowGap - 3 : gy + rowGap + 2;
+    var gRow2 = goalAbove ? gy - 2 * rowGap - 3 : gy + 2 * rowGap + 2;
+    var gMaxW = Math.max(70, gx - 16 - X0);
+    var vNote = (!narrow && Math.abs(vg) > 1e-9) ? '（箭头长度 ∝ |v|）' : '';
+    fitText(ctx, 'goal: p_g = ' + d.toFixed(2) + ' m', gx - 16, gRow1, COLOR.orange, 10.5, gMaxW, 'right');
+    fitText(ctx, 'v_g = ' + (vg >= 0 ? '+' : '') + vg.toFixed(2) + ' m/s' + vNote,
+      gx - 16, gRow2, COLOR.orange, 10.5, gMaxW, 'right');
+
+    // ---------- 当前 T：竖直虚线（紫色） ----------
+    vline(ctx, X(T), Y0, Y1, COLOR.purple, 1.5, [6, 4]);
+    var tLabel = 'T = ' + T.toFixed(2) + ' s';
+    var leftSide = X(T) > (X0 + X1) / 2;
+    text(ctx, tLabel, X(T) + (leftSide ? -8 : 8), Y0 + 13, COLOR.purple, 11, leftSide ? 'right' : 'left', '600');
+
+    // ---------- 底部公式与结论（窄画布拆成 4 行，宽画布 2 行） ----------
+    var rho = isFinite(st.rho) ? st.rho : RHO_DEF;
+    var rhoTxt = 'rho = ' + rho.toFixed(1);
+    var threeD = (rho > 0)
+      ? '（三维：x/y/z 三轴各算 ∫u²dt 再相加，rho*T 只加一次 → (2r+1)^3 个原语）'
+      : '（rho = 0 ⇒ cost 随 T 单调递减、无有限最优；三维：三轴各算一次再相加）';
+    var fw = pw + mr - 8;
+    if (narrow) {
+      fitText(ctx, 'A = d - v_c*T,  B = v_g - v_c', X0, h - 64, COLOR.dim, 9.5, fw, 'left');
+      fitText(ctx, 'alpha = (-12A + 6T*B)/T^3,  beta = (6T*A - 2T^2*B)/T^3', X0, h - 49, COLOR.dim, 9.5, fw, 'left');
+      fitText(ctx, 'cost = alpha^2*T^3/3 + alpha*beta*T^2 + beta^2*T + rho*T   (' + rhoTxt + ')', X0, h - 34, COLOR.dim, 9.5, fw, 'left');
+      fitText(ctx, (rho > 0) ? '三维：三轴各算 ∫u²dt 再相加，rho*T 只加一次' : 'rho = 0：代价单调递减，无有限最优',
+        X0, h - 19, COLOR.dim, 9.5, fw, 'left');
+    } else {
+      fitText(ctx, 'A = d - v_c*T,  B = v_g - v_c;   alpha = (-12A + 6T*B)/T^3,  beta = (6T*A - 2T^2*B)/T^3',
+        X0, h - 28, COLOR.dim, 10.5, fw, 'left');
+      fitText(ctx, 'cost = alpha^2*T^3/3 + alpha*beta*T^2 + beta^2*T + rho*T（' + rhoTxt + '：∫u²dt 是控制代价，rho*T 是时间惩罚）' + threeD,
+        X0, h - 12, COLOR.dim, 10.5, fw, 'left');
+    }
+  }
+
+  /* =========================================================================
+   * 4. 下方代价画布：#cv-heur-cost —— cost(T) 曲线与 T_h
+   * ========================================================================= */
+
+  function drawCost(canvas, st, scan) {
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    var vw = fitCanvas(canvas, 220);
+    var w = vw.w, h = vw.h;
+    if (!(w > 40) || !(h > 40)) return;
+    clearBg(ctx, vw);
+
+    var narrow = w < 620;
+    // 布局：顶部 40px 两行标题栏（标题 + a_max/ρ + 结论），底部 34px 一行图例（半透明面板）
+    var ml = (w < 460) ? 56 : 64, mr = 18, mt = 40, mb = 34;
+    var pw = Math.max(24, w - ml - mr), ph = Math.max(24, h - mt - mb);
+    var X0 = ml, Y0 = mt, X1 = ml + pw, Y1 = mt + ph;
+
+    // 横轴范围跟着 #heur-t 的 max 走（页面为 8 s），左端固定 0.05 s
+    var tHi = (isFinite(scan.tHi) && scan.tHi > T_LO) ? scan.tHi : T_HI_DEF;
+    var rho = isFinite(scan.rho) ? scan.rho : RHO_DEF;
+    var branch = scan.branch || 'interior';
+    var degenerate = (branch === 'degenerate');
+    var rangeTxt = 'T ∈ [' + T_LO.toFixed(2) + ', ' + tHi.toFixed(tHi >= 10 ? 0 : 1) + '] s';
+
+    // 第 1 行：标题（左） + a_max / ρ（右，统一放在标题栏里，不再压网格）
+    if (narrow) {
+      fitText(ctx, '代价 cost(T) = ∫u²dt + ρT（对数轴）', X0, 14, COLOR.text, 12, pw - 116, 'left', '600');
+    } else {
+      fitText(ctx, '启发式代价曲线：cost(T) = ∫u²dt + ρT（纵轴对数刻度，' + rangeTxt + '）', X0, 14, COLOR.text, 12, pw - 150, 'left', '600');
+    }
+    text(ctx, 'a_max = ' + A_MAX + ' m/s²，ρ = ' + rho.toFixed(1), X1, 14, COLOR.dim, 10.5, 'right');
+
+    // 第 2 行：结论写在标题栏里（图内不放文字，保证不压曲线/网格）
+    if (degenerate) {
+      // ρ = 0：代价单调递减，没有有限的最优 T —— 必须如实说明（这正是 e_c 里要有 ρ 的原因）
+      fitText(ctx, narrow ? 'ρ = 0：代价随 T 单调递减，不存在有限的代价最小点（退化分支：取可行域左边界）'
+                          : 'ρ = 0：代价随 T 单调递减，不存在有限的代价最小点 —— 这正是边代价 e_c 里必须有 ρ 的原因（此处 T_h 为退化分支：取可行域左边界）',
+        X0, 28, COLOR.orange, 10.5, pw + mr - 8, 'left', '600');
+    } else if (branch === 'accel-bound') {
+      fitText(ctx, '∂cost/∂T = -4(T*v_g-3d)²/T⁴ + ρ = 0 的根加速度超限 ⇒ T_h 取可行域左边界',
+        X0, 28, COLOR.dim, 10, pw + mr - 8, 'left');
+    } else if (branch === 'window-edge') {
+      fitText(ctx, '区间内 cost 仍在下降（最优 T 比右端更长）⇒ T_h 取扫描区间右端 ' + tHi.toFixed(1) + ' s（ρ 越小最优 T 越长）',
+        X0, 28, COLOR.dim, 10, pw + mr - 8, 'left');
+    } else if (branch === 'infeasible') {
+      fitText(ctx, '整个扫描区间内 |u|max 都超过 a_max：没有可行轨迹（请增大 a_max 或调整参数）',
+        X0, 28, COLOR.orange, 10.5, pw + mr - 8, 'left');
+    } else {
+      fitText(ctx, narrow ? '∂cost/∂T = -4(T*v_g-3d)²/T⁴ + ρ = 0 有实根 ⇒ 最优 T 取内点'
+                          : 'cost(T) = ∫u²dt + ρT ⇒ ∂cost/∂T = -4(T*v_g-3d)²/T⁴ + ρ = 0 有实根，最优 T 取内点（还需满足 |u|max ≤ a_max）',
+        X0, 28, COLOR.dim, 10, pw + mr - 8, 'left');
+    }
+
+    box(ctx, X0, Y0, X1, Y1, COLOR.grid, 1);
+
+    var s = scan.samples;
+    if (s.length < 2) {   // 极端参数下的兜底：不留空白画面也不画异常图形
+      var cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2;
+      text(ctx, '当前参数下代价恒为 0 或全部非有限，无可用曲线（请增大目标距离 d）', cx, cy, COLOR.dim, 12, 'center');
+      return;
+    }
+
+    var cLo = Infinity, cHi = -Infinity;
+    for (var i = 0; i < s.length; i++) {
+      if (s[i].cost < cLo) cLo = s[i].cost;
+      if (s[i].cost > cHi) cHi = s[i].cost;
+    }
+    var lLo = Math.log(cLo) / Math.LN10, lHi = Math.log(cHi) / Math.LN10;
+    if (!(lHi - lLo > 1e-6)) { var mid = (lLo + lHi) / 2; lLo = mid - 0.5; lHi = mid + 0.5; }
+
+    function X(t) { return X0 + (t - T_LO) / (tHi - T_LO) * pw; }
+    function Y(c) {
+      var yy = Y1 - (Math.log(c) / Math.LN10 - lLo) / (lHi - lLo) * ph;
+      return Math.max(Y0, Math.min(Y1, yy));
+    }
+
+    // 不可行区（加速度超限）淡红底色：注意它的右边界是"加速度可行下界"，
+    // 不是最优 T_h（T_h 现在通常是内点，两者不再重合，必须分开画）。
+    var bandT = isFinite(scan.feasibleLeft) ? scan.feasibleLeft : NaN;
+    if (isFinite(bandT) && bandT > T_LO) {
+      var bx = X(bandT);
+      ctx.fillStyle = 'rgba(255, 92, 122, 0.10)';
+      ctx.fillRect(X0, Y0, bx - X0, ph);
+      var bandW = Math.max(50, bx - X0 - 12);
+      fitText(ctx, 'T < ' + bandT.toFixed(2) + ' s', X0 + 6, Y1 - 22, COLOR.red, 10, bandW, 'left');
+      fitText(ctx, narrow ? '加速度超限' : '加速度超限，不可行', X0 + 6, Y1 - 8, COLOR.red, 10, bandW, 'left');
+    } else if (!isFinite(bandT) && scan.branch === 'infeasible') {
+      ctx.fillStyle = 'rgba(255, 92, 122, 0.10)';
+      ctx.fillRect(X0, Y0, pw, ph);
+      fitText(ctx, '整个区间加速度都超限：没有可行轨迹', X0 + 6, Y0 + 13, COLOR.red, 10, pw - 12, 'left');
+    }
+
+    // 加速度可行下界（红色竖虚线）：与橙色的"最优 T_h"是两个不同的点，单独标出来
+    if (isFinite(bandT) && bandT > T_LO) {
+      var fx = X(bandT);
+      vline(ctx, fx, Y0, Y1, COLOR.red, 1, [3, 3]);
+      if (!isFinite(scan.th) || Math.abs(scan.th - bandT) > 0.05) {
+        var toRight = (fx + 76 < X1);
+        fitText(ctx, '可行下界 ' + bandT.toFixed(2) + ' s', fx + (toRight ? 5 : -5), Y1 - 4, COLOR.red, 9.5,
+          Math.max(30, toRight ? (X1 - 6 - fx) : (fx - X0 - 6)), toRight ? 'left' : 'right');
+      }
+    }
+
+    // 时间刻度与对数网格
+    var tTicks = ticks(0, tHi * 0.999, 6);
+    for (i = 0; i < tTicks.length; i++) {
+      vline(ctx, X(tTicks[i]), Y0, Y1, COLOR.grid, 1);
+      text(ctx, tickLabel(tTicks[i]), X(tTicks[i]), Y1 + 14, COLOR.dim, 10, 'center');
+    }
+    text(ctx, 'T (s)', X1, Y1 + 14, COLOR.dim, 10, 'right');
+    var cTicks = logTicks(cLo, cHi);
+    for (i = 0; i < cTicks.length; i++) {
+      hline(ctx, X0, X1, Y(cTicks[i]), COLOR.grid, 1, [3, 4]);
+      text(ctx, tickLabel(cTicks[i]), X0 - 6, Y(cTicks[i]) + 3.5, COLOR.dim, 10, 'right');
+    }
+
+    // 代价曲线：可行段蓝色实线，不可行段红色虚线（一眼看出可行域）
+    ctx.save();
+    ctx.beginPath(); ctx.rect(X0, Y0, pw, ph); ctx.clip();
+    function seg(kind) {                       // kind: 1 可行, 0 不可行
+      var started = false;
+      ctx.beginPath();
+      for (var j = 0; j < s.length; j++) {
+        var ok = s[j].feasible ? 1 : 0;
+        if (ok !== kind) { started = false; continue; }
+        var px = X(s[j].T), py = Y(s[j].cost);
+        if (!started) { ctx.moveTo(px, py); started = true; } else { ctx.lineTo(px, py); }
+      }
+      ctx.strokeStyle = kind ? COLOR.blue : COLOR.red;
+      ctx.lineWidth = kind ? 2 : 1.5;
+      ctx.setLineDash(kind ? [] : [5, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    seg(1); seg(0);
+    ctx.restore();
+
+    // ρ = 0 的退化驻点（紫色小三角）：此时 dcost/dT = -4*(T*v_g-3d)^2/T^4 只有 T = 3d/v_g
+    // 这个"水平拐点"根 —— 斜率触零但仍单调不增，所以画出来提醒学生它不是极小点。
+    // ρ > 0 时真正的最优已经在橙点标出，这里不再重复画。
+    if (degenerate && isFinite(scan.statT)) {
+      var stx = X(scan.statT);
+      vline(ctx, stx, Y0, Y1, COLOR.purple, 1, [2, 4]);
+      ctx.fillStyle = COLOR.purple;
+      ctx.beginPath();
+      ctx.moveTo(stx, Y1 - 1); ctx.lineTo(stx - 4.5, Y1 - 10); ctx.lineTo(stx + 4.5, Y1 - 10);
+      ctx.closePath(); ctx.fill();
+    }
+
+    // 当前滑块位置 T（红点 + 红虚线）
+    var rNow = solveBvp(st.dp, V_C, st.dv, st.T, rho);
+    var txNow = NaN;
+    if (isFinite(rNow.cost) && rNow.cost > 0) {
+      var tx = X(st.T), ty = Y(rNow.cost);
+      txNow = tx;
+      vline(ctx, tx, ty, Y1, COLOR.red, 1.5, [5, 4]);
+      dot(ctx, tx, ty, 4.5, COLOR.red);
+      // 与 T_h 靠得很近时用"横向让开"而不是"往下挪"：往下挪会撞上时间刻度行
+      var nearTh = isFinite(scan.th) && Math.abs(X(scan.th) - tx) < 78;
+      var off = nearTh ? 64 : 7;
+      var align = (tx > (X0 + X1) * 0.62) ? 'right' : 'left';
+      var lx = tx + (align === 'right' ? -off : off);
+      var lw = (align === 'right') ? (lx - X0 - 6) : (X1 - 6 - lx);
+      if (lw < 56) {                                  // 这一侧放不下就换到另一侧
+        align = (align === 'right') ? 'left' : 'right';
+        lx = tx + (align === 'right' ? -off : off);
+        lw = (align === 'right') ? (lx - X0 - 6) : (X1 - 6 - lx);
+      }
+      var ly = ty - 9;
+      if (ly < Y0 + 12) ly = Math.min(ty + 17, Y1 - 6);      // 顶到上边界才挪到点下方
+      fitText(ctx, 'T = ' + st.T.toFixed(2) + ' s', lx, ly, COLOR.red, 10.5, Math.max(30, lw), align, '600');
+    }
+
+    // 最优 T_h（橙点 + 橙虚线）
+    var hxNow = NaN;
+    if (isFinite(scan.th) && isFinite(scan.thCost) && scan.thCost > 0) {
+      var hx = X(scan.th), hy = Y(scan.thCost);
+      hxNow = hx;
+      vline(ctx, hx, Y0, hy, COLOR.orange, 1.5, [6, 4]);
+      dot(ctx, hx, hy, 5.5, COLOR.orange);
+      var ha = (hx > (X0 + X1) * 0.75) ? 'right' : 'left';
+      var nearNow = isFinite(txNow) && Math.abs(txNow - hx) < 78;
+      var hy2 = hy - (nearNow ? 24 : 9);
+      if (hy2 < Y0 + 12) hy2 = Math.min(hy + 17, Y1 - 6);    // 同样避免跑出画框
+      var hlx = hx + (ha === 'right' ? -8 : 8);
+      var hlw = (ha === 'right') ? (hlx - X0 - 6) : (X1 - 6 - hlx);
+      // 退化分支/边界分支要在标签上标出来，不能谎称"最优"
+      var hTxt = 'T_h = ' + scan.th.toFixed(3) + ' s';
+      if (degenerate) { hTxt += narrow ? '（退化）' : '（退化分支：可行域左边界）'; }
+      else if (branch === 'accel-bound') { hTxt += narrow ? '（边界）' : '（加速度受限：取可行域左边界）'; }
+      fitText(ctx, hTxt, hlx, hy2, COLOR.orange, 10.5, Math.max(30, hlw), ha, '600');
+    }
+
+    // 图例：统一放到画布底部一行，并垫一块半透明深色面板，保证不压曲线、不与红色阴影混淆
+    var items = narrow
+      ? [{ t: '蓝=可行', c: COLOR.blue }, { t: '红虚线=不可行', c: COLOR.red },
+         { t: degenerate ? '橙=T_h(退化)' : '橙=T_h(最优)', c: COLOR.orange }, { t: '红=当前 T', c: COLOR.red }]
+      : [{ t: '蓝实线 = 可行区（|u|max <= a_max）', c: COLOR.blue }, { t: '红虚线 = 不可行区（加速度超限）', c: COLOR.red },
+         { t: degenerate ? '橙点 = T_h（ρ=0 退化：取可行域左边界）' : '橙点 = 最优 T_h（∂cost/∂T = 0 的内点根）', c: COLOR.orange },
+         { t: '红点 = 当前滑块 T', c: COLOR.red }];
+    if (degenerate && isFinite(scan.statT)) {
+      items.push(narrow ? { t: '紫=拐点', c: COLOR.purple } : { t: '紫点 = 斜率触零但不最优的拐点', c: COLOR.purple });
+    }
+    var sep = narrow ? '  ' : '　';
+    ctx.font = fontOf(10, '');
+    var total = 0, k;
+    for (k = 0; k < items.length; k++) {
+      total += ctx.measureText(items[k].t).width + ctx.measureText(sep).width;
+    }
+    total = Math.max(0, total - ctx.measureText(sep).width);
+    var panelX = X0 - 4, panelW = Math.min(pw + 8, total + 18);
+    ctx.fillStyle = 'rgba(15, 23, 48, 0.9)';
+    ctx.fillRect(panelX, h - 19, panelW, 16);
+    ctx.strokeStyle = COLOR.grid; ctx.lineWidth = 1;
+    ctx.strokeRect(panelX, h - 19, panelW, 16);
+    var lx = panelX + 5, limit = panelX + panelW - 4;
+    for (k = 0; k < items.length; k++) {
+      ctx.font = fontOf(10, '');
+      var avail = limit - lx;
+      if (avail < 14) break;
+      if (ctx.measureText(items[k].t).width > avail) {
+        fitText(ctx, items[k].t, lx, h - 7, items[k].c, 10, avail, 'left');
+        break;
+      }
+      text(ctx, items[k].t, lx, h - 7, items[k].c, 10, 'left');
+      lx += ctx.measureText(items[k].t).width;
+      if (k < items.length - 1) {
+        text(ctx, sep, lx, h - 7, COLOR.dim, 10, 'left');
+        lx += ctx.measureText(sep).width;
+      }
+    }
+  }
+
+  /* =========================================================================
+   * 5. 读数 / 状态文字 / 交互
+   * ========================================================================= */
+
+  function $(id) { return document.getElementById(id); }
+
+  function setText(el, str) { if (el) { el.textContent = str; } }
+
+  function setWarn(el, on) {
+    if (!el || !el.classList) return;
+    if (on) { el.classList.add('warn'); } else { el.classList.remove('warn'); }
+  }
+
+  /** 读滑块值，并夹在滑块自带的 min/max 内（读不到就用默认值兜底） */
+  function readRange(el, def, lo, hi) {
+    if (!el) return def;
+    var v = parseFloat(el.value);
+    if (!isFinite(v)) return def;
+    var a = parseFloat(el.getAttribute('min')), b = parseFloat(el.getAttribute('max'));
+    if (isFinite(a)) lo = a;
+    if (isFinite(b)) hi = b;
+    if (v < lo) v = lo;
+    if (v > hi) v = hi;
+    return v;
+  }
+
+  function readState() {
+    return {
+      T: readRange(elT, T_DEF, T_MIN, T_MAX),
+      dp: readRange(elDp, DP_DEF, DP_MIN, DP_MAX),
+      dv: readRange(elDv, DV_DEF, DV_MIN, DV_MAX),
+      rho: readRange(elRho, RHO_DEF, RHO_MIN, RHO_MAX)
+    };
+  }
+
+  /** 读滑块的量程（min/max/step），读不到就用兜底值 */
+  function sliderRange(el, defMin, defMax, defStep) {
+    var out = { lo: defMin, hi: defMax, step: defStep };
+    if (!el) return out;
+    var a = parseFloat(el.getAttribute('min')), b = parseFloat(el.getAttribute('max')), c = parseFloat(el.getAttribute('step'));
+    if (isFinite(a)) out.lo = a;
+    if (isFinite(b)) out.hi = b;
+    if (isFinite(c) && c > 0) out.step = c;
+    if (!(out.hi > out.lo)) { out.lo = defMin; out.hi = defMax; }
+    return out;
+  }
+
+  /** 把目标值向上吸附到滑块的 step 网格上并夹在量程内，保证吸附后 T >= T_h（即仍然可行） */
+  function snapUp(el, value, defMin, defMax, defStep) {
+    var rng = sliderRange(el, defMin, defMax, defStep);
+    var lo = rng.lo, hi = rng.hi, stp = rng.step;
+    if (!isFinite(value)) return lo;
+    if (value < lo) value = lo;
+    if (value > hi) value = hi;
+    var k = Math.ceil((value - lo) / stp - 1e-9);
+    var snapped = lo + k * stp;
+    if (snapped > hi) snapped = hi;
+    return parseFloat(snapped.toFixed(6));
+  }
+
+  function render() {
+    var st = readState();
+    // 代价曲线的右端跟随 #heur-t 的 max（页面为 8 s），T_h 也在这个区间里找
+    var rngT = sliderRange(elT, T_MIN, T_MAX, T_STEP);
+    var tHi = (rngT.hi > T_LO + 0.1) ? rngT.hi : T_HI_DEF;
+
+    var r = solveBvp(st.dp, V_C, st.dv, st.T, st.rho);
+    var scan = scanT(st.dp, V_C, st.dv, st.rho, tHi);
+    lastState = st;
+
+    if (cv) drawMain(cv, st, r, scan);
+    if (cvCost) drawCost(cvCost, st, scan);
+
+    // ---- 读数 ----
+    setText(outT, st.T.toFixed(2) + ' s');
+    setText(outDp, st.dp.toFixed(1) + ' m');
+    setText(outDv, (st.dv > 0 ? '+' : '') + st.dv.toFixed(2) + ' m/s');
+    setText(outRho, st.rho.toFixed(1));
+    setText(outAlpha, fmtNum(r.alpha));
+    setText(outBeta, fmtNum(r.beta));
+    setText(outTh, isFinite(scan.th) ? (scan.th.toFixed(3) + ' s') : '--');
+    setText(outTstar, (isFinite(scan.thCost) ? scan.thCost.toFixed(3) : '--'));
+
+    // ---- T_h 是否落在滑块量程内（#heur-t 量程 0.2–8 s）；超出要明确说明 ----
+    var thOut = isFinite(scan.th) && (scan.th < rngT.lo - 1e-9 || scan.th > rngT.hi + 1e-9);
+    var thNote = thOut ? ('；T_h=' + scan.th.toFixed(3) + ' s 超出滑块范围 [' + rngT.lo + ', ' + rngT.hi + '] s，已取到边界') : '';
+
+    // ---- T_h 的性质说明（内点最优 / 退化 / 加速度受限），讲稿口径必须写清楚 ----
+    var thKind = '';
+    if (st.rho <= 0) {
+      thKind = '；ρ = 0：代价随 T 单调递减，不存在有限的代价最小点 —— 这正是边代价 e_c 里必须有 ρ 的原因' +
+        (isFinite(scan.th) ? '（此处 T_h=' + scan.th.toFixed(3) + ' s 为退化分支：取可行域左边界）' : '');
+    } else if (scan.branch === 'interior' && isFinite(scan.th)) {
+      thKind = '；T_h=' + scan.th.toFixed(3) + ' s 是 ∂cost/∂T = -4(T·v_g-3d)²/T⁴ + ρ = 0 的内点根';
+    } else if (scan.branch === 'accel-bound' && isFinite(scan.th)) {
+      thKind = '；cost 的内点最优 T=' + (isFinite(scan.interiorT) ? scan.interiorT.toFixed(3) : '--') +
+        ' s 加速度超限，T_h 退回可行域左边界 ' + scan.th.toFixed(3) + ' s';
+    } else if (scan.branch === 'window-edge' && isFinite(scan.th)) {
+      thKind = '；ρ 偏小：最优 T 超过扫描区间右端，此处 T_h 取区间右端 ' + scan.th.toFixed(3) + ' s（ρ 越小最优 T 越长）';
+    } else if (scan.branch === 'infeasible') {
+      thKind = '；当前参数下扫描区间内没有可行轨迹（|u|max 全部超过 a_max=' + A_MAX + ' m/s²）';
+    }
+
+    // ---- 状态文字（可行 / 无解），并切换 warn 类 ----
+    if (r.ok) {
+      setWarn(elStatus, false);
+      setText(elStatus, '该 T 可行：α=' + fmtNum(r.alpha) + '，β=' + fmtNum(r.beta) +
+        '，峰值 |u|max=' + fmtNum(r.uPeak) + ' ≤ a_max=' + A_MAX + ' m/s²' + thNote + thKind);
+    } else {
+      setWarn(elStatus, true);
+      var peak = isFinite(r.uPeak) ? fmtNum(r.uPeak) : '∞';
+      setText(elStatus, 'T 过小，无法连接目标：需要峰值加速度 |u|max=' + peak +
+        ' > a_max=' + A_MAX + ' m/s²（请增大 T，或点「自动吸附到 T_h」）' + thNote + thKind);
+    }
+  }
+
+  // ---- 平滑吸附动画（约 0.6 s）----
+  var animTimer = 0, animRaf = 0;
+  function nowMs() {
+    if (window.performance && typeof window.performance.now === 'function') return window.performance.now();
+    return new Date().getTime();
+  }
+  function raf(fn) {
+    if (typeof window.requestAnimationFrame === 'function') return window.requestAnimationFrame(fn);
+    return window.setTimeout(fn, 16);
+  }
+  function cancelRaf(id) {
+    if (!id) return;
+    if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(id);
+    else window.clearTimeout(id);
+  }
+
+  function animateTo(target) {
+    if (!elT || !isFinite(target)) return;
+    var from = readRange(elT, T_DEF, T_MIN, T_MAX);
+    var to = snapUp(elT, target, T_MIN, T_MAX, T_STEP);   // 向上取整到滑块步长，保证吸附后仍可行
+    cancelRaf(animRaf); animRaf = 0;
+    var t0 = nowMs(), dur = 600;
+    function step() {
+      var k = (nowMs() - t0) / dur;
+      if (!(k > 0)) k = 0;
+      if (k > 1) k = 1;
+      // easeInOutCubic：起步慢、中间快、收尾慢，"吸附"的手感更好
+      var e = (k < 0.5) ? (4 * k * k * k) : (1 - Math.pow(-2 * k + 2, 3) / 2);
+      var v = from + (to - from) * e;
+      elT.value = v.toFixed(3);
+      render();
+      if (k < 1) { animRaf = raf(step); }
+      else {
+        animRaf = 0;
+        elT.value = String(to);
+        render();
+        // 通知页面其它监听者：T 已经被程序改过（不派发 input，避免与自身监听互相触发多画一次）
+        try {
+          var ev = document.createEvent('HTMLEvents');
+          ev.initEvent('change', true, false);
+          elT.dispatchEvent(ev);
+        } catch (err) { /* 忽略：老浏览器没有 createEvent 也不影响演示 */ }
+      }
+    }
+    animRaf = raf(step);
+  }
+
+  /* =========================================================================
+   * 6. 初始化：找元素、绑事件、resize 重绘
+   * ========================================================================= */
+  var cv = null, cvCost = null;
+  var elT = null, elDp = null, elDv = null, elRho = null, elAuto = null;
+  var outT = null, outDp = null, outDv = null, outRho = null, outAlpha = null, outBeta = null, outTh = null, outTstar = null, elStatus = null;
+  var lastState = null, resizeTimer = 0, booted = false;
+
+  function onResize() {
+    if (resizeTimer) { window.clearTimeout(resizeTimer); }
+    resizeTimer = window.setTimeout(function () {
+      resizeTimer = 0;
+      render();
+    }, 120);
+  }
+
+  function init() {
+    if (booted) return;
+    // 主画布不存在就安静返回（这个演示脚本可能被放到没有该演示的页面上）
+    cv = $('cv-heur');
+    if (!cv) return;
+    booted = true;
+
+    cvCost = $('cv-heur-cost');
+    elT = $('heur-t'); elDp = $('heur-dp'); elDv = $('heur-dv');
+    elRho = $('heur-rho');                 // ρ 滑块可能不存在（老页面），读不到就用默认 2.0
+    elAuto = $('heur-auto');
+    outT = $('heur-t-out'); outDp = $('heur-dp-out'); outDv = $('heur-dv-out');
+    outRho = $('heur-rho-out');            // ρ 读数不存在也要能安静运行
+    outAlpha = $('heur-alpha'); outBeta = $('heur-beta');
+    outTh = $('heur-th-out'); outTstar = $('heur-tstar-out'); elStatus = $('heur-status');
+
+    function bind(el, evt, fn) {
+      if (el && el.addEventListener) el.addEventListener(evt, fn, false);
+    }
+    bind(elT, 'input', render);
+    bind(elT, 'change', render);
+    bind(elDp, 'input', render);
+    bind(elDp, 'change', render);
+    bind(elDv, 'input', render);
+    bind(elDv, 'change', render);
+    bind(elRho, 'input', render);          // 拖 ρ 即时重算并重绘两张画布 + 所有读数
+    bind(elRho, 'change', render);
+
+    bind(elAuto, 'click', function () {
+      var st = readState();
+      var rngT = sliderRange(elT, T_MIN, T_MAX, T_STEP);
+      var tHi = (rngT.hi > T_LO + 0.1) ? rngT.hi : T_HI_DEF;
+      // 用最新参数重新求 T_h，避免用到过期结果；量程与 ρ 都按当前滑块值来
+      var scan = scanT(st.dp, V_C, st.dv, st.rho, tHi);
+      if (isFinite(scan.th)) animateTo(scan.th);
+    });
+
+    if (window.addEventListener) {
+      window.addEventListener('resize', onResize, false);
+      window.addEventListener('orientationchange', onResize, false);
+    }
+
+    render();
+    // 布局（比如字体加载、容器宽度变化）可能在 DOMContentLoaded 之后才稳定，再补画一帧
+    raf(function () { if (!animRaf) render(); });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, false);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
